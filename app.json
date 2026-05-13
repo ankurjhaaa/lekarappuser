@@ -1,25 +1,40 @@
 {
   "expo": {
-    "name": "lekarappuser",
+    "name": "Lekar",
     "slug": "lekarappuser",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "lekarappuser",
-    "userInterfaceStyle": "automatic",
+    "scheme": "lekar",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lekar.user",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Lekar needs your location to show nearby drivers and set your pickup point.",
+        "NSLocationAlwaysUsageDescription": "Lekar uses your location for ride tracking."
+      }
     },
     "android": {
+      "package": "com.lekar.user",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#E63946",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "VIBRATE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAUTN27SDgS8mbpMMF4IgQ55UL81Vokx3Q"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -33,10 +48,13 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
-          "dark": {
-            "backgroundColor": "#000000"
-          }
+          "backgroundColor": "#E63946"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Lekar needs location for ride tracking."
         }
       ]
     ],
