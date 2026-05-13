@@ -14,7 +14,8 @@ import { Platform } from 'react-native';
  */
 
 // Your computer's local network IP — both emulator & physical device will work
-const HOST = '192.168.29.128';
+// Your computer's local network IP — both emulator & physical device will work
+const HOST = '10.158.108.98';
 
 export const CONFIG = {
   // API Base URL

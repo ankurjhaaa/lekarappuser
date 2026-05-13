@@ -10,8 +10,10 @@ import {
   Alert,
   ScrollView,
   Animated,
+  Modal,
+  TextInput,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../src/components/MapViewSafe';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../src/constants/theme';
@@ -43,14 +45,21 @@ export default function RideDetailScreen() {
   const [driverInfo, setDriverInfo] = useState(null);
   const [driverLoc, setDriverLoc] = useState(null);
   const [driverHeading, setDriverHeading] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [showDestChange, setShowDestChange] = useState(false);
+  const [destQuery, setDestQuery] = useState('');
+  const [destSuggestions, setDestSuggestions] = useState([]);
+  const [destLoading, setDestLoading] = useState(false);
   const mapRef = useRef(null);
   const pollRef = useRef(null);
   const slideAnim = useRef(new Animated.Value(200)).current;
 
-  // Load directions + estimates on mount
+  // Load directions first, then estimates with real distance
   useEffect(() => {
-    loadRoute();
-    loadVehicles();
+    (async () => {
+      await loadRoute();
+      await loadVehicles();
+    })();
     if (params.bookingId) loadBooking(params.bookingId);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -95,12 +104,14 @@ export default function RideDetailScreen() {
       if (res.data.success) setVehicles(res.data.vehicles || []);
     } catch (e) { /* silent */ }
 
-    if (pickup?.lat && drop?.lat) {
+    const storeState = useRideStore.getState();
+    if (storeState.pickup?.lat && storeState.drop?.lat) {
       try {
+        const realDist = storeState.distance || 5;
         const res = await ridesAPI.estimate({
-          pickup_lat: pickup.lat, pickup_lng: pickup.lng,
-          drop_lat: drop.lat, drop_lng: drop.lng,
-          distance_km: distance || 5,
+          pickup_lat: storeState.pickup.lat, pickup_lng: storeState.pickup.lng,
+          drop_lat: storeState.drop.lat, drop_lng: storeState.drop.lng,
+          distance_km: realDist,
         });
         if (res.data.success) setEstimates(res.data.estimates || []);
       } catch (e) { /* silent */ }
@@ -254,6 +265,53 @@ export default function RideDetailScreen() {
     return 'bicycle';
   };
 
+  // Destination change search
+  const searchDestination = async (text) => {
+    setDestQuery(text);
+    if (text.length < 3) { setDestSuggestions([]); return; }
+    try {
+      const res = await placesAPI.autocomplete(text, pickup?.lat, pickup?.lng);
+      if (res.data.success) setDestSuggestions(res.data.predictions || []);
+    } catch (e) { /* silent */ }
+  };
+
+  const handleDestinationChange = async (place) => {
+    setDestLoading(true);
+    try {
+      const detailRes = await placesAPI.details(place.place_id);
+      if (!detailRes.data.success) throw new Error('Failed');
+      const newLat = detailRes.data.lat;
+      const newLng = detailRes.data.lng;
+      // Get new distance from current drop to new drop
+      const dirRes = await placesAPI.directions(pickup.lat, pickup.lng, newLat, newLng);
+      const newDist = dirRes.data.distance_km || 5;
+      const newDur = dirRes.data.duration_min || 0;
+      // Call API
+      const res = await ridesAPI.changeDestination(currentBooking.id, {
+        new_drop_address: place.description,
+        new_drop_lat: newLat,
+        new_drop_lng: newLng,
+        new_distance_km: newDist,
+        new_duration_min: newDur,
+      });
+      if (res.data.success) {
+        setCurrentBooking(res.data.booking);
+        setShowDestChange(false);
+        setDestQuery('');
+        setDestSuggestions([]);
+        // Update route on map
+        if (dirRes.data.geometry) {
+          const coords = decodePolyline(dirRes.data.geometry);
+          setRouteCoords(coords);
+        }
+        Alert.alert('Updated', `New fare: ${formatCurrency(res.data.new_fare)}`);
+      }
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.message || 'Failed to change destination.');
+    }
+    setDestLoading(false);
+  };
+
   // Status-specific UI
   const renderStatusUI = () => {
     if (!bookingStatus) return null;
@@ -319,13 +377,27 @@ export default function RideDetailScreen() {
           <View style={styles.ridingInfo}>
             <View style={styles.ridingInfoItem}>
               <Text style={styles.ridingLabel}>Destination</Text>
-              <Text style={styles.ridingValue} numberOfLines={1}>{drop?.address || currentBooking?.drop_location}</Text>
+              <Text style={styles.ridingValue} numberOfLines={1}>{currentBooking?.drop_location || drop?.address}</Text>
+            </View>
+            <View style={styles.ridingInfoItem}>
+              <Text style={styles.ridingLabel}>Distance</Text>
+              <Text style={styles.ridingValue}>{formatDistance(currentBooking?.distance_km || distance)}</Text>
             </View>
             <View style={styles.ridingInfoItem}>
               <Text style={styles.ridingLabel}>Fare</Text>
-              <Text style={styles.ridingValue}>{formatCurrency(currentBooking?.fare_total)}</Text>
+              <Text style={[styles.ridingValue, { color: COLORS.primary, fontWeight: '800' }]}>
+                {formatCurrency(currentBooking?.fare_total || fare)}
+              </Text>
             </View>
           </View>
+          {/* Change Destination Button */}
+          <TouchableOpacity
+            style={styles.changeDestBtn}
+            onPress={() => setShowDestChange(true)}
+          >
+            <Ionicons name="location-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.changeDestText}>Change Destination</Text>
+          </TouchableOpacity>
           {/* SOS Button */}
           <TouchableOpacity style={styles.sosBtn} onPress={handleSOS} activeOpacity={0.7}>
             <Ionicons name="warning" size={18} color={COLORS.white} />
@@ -341,11 +413,27 @@ export default function RideDetailScreen() {
           <Ionicons name="checkmark-circle" size={48} color={COLORS.success} />
           <Text style={styles.statusTitle}>Ride Completed!</Text>
           <Text style={styles.completedFare}>{formatCurrency(currentBooking?.fare_total)}</Text>
+          
+          {/* Star Rating */}
+          <Text style={styles.rateLabel}>Rate your driver</Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map(s => (
+              <TouchableOpacity key={s} onPress={() => setRating(s)}>
+                <Ionicons name={s <= rating ? 'star' : 'star-outline'} size={36} color={s <= rating ? '#F59E0B' : COLORS.textLight} />
+              </TouchableOpacity>
+            ))}
+          </View>
+
           <TouchableOpacity
             style={styles.doneBtn}
-            onPress={() => { clearRide(); router.replace('/(main)/(tabs)/home'); }}
+            onPress={async () => {
+              if (rating > 0) {
+                try { await ridesAPI.review(currentBooking.id, rating, ''); } catch(e) {}
+              }
+              clearRide(); router.replace('/(main)/(tabs)/home');
+            }}
           >
-            <Text style={styles.doneBtnText}>Done</Text>
+            <Text style={styles.doneBtnText}>{rating > 0 ? 'Submit & Done' : 'Skip'}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -495,6 +583,39 @@ export default function RideDetailScreen() {
           </>
         )}
       </Animated.View>
+
+      {/* Destination Change Modal */}
+      <Modal visible={showDestChange} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Change Destination</Text>
+              <TouchableOpacity onPress={() => { setShowDestChange(false); setDestQuery(''); setDestSuggestions([]); }}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Search new destination..."
+              value={destQuery}
+              onChangeText={searchDestination}
+              autoFocus
+            />
+            {destLoading && <ActivityIndicator style={{ marginTop: 16 }} color={COLORS.primary} />}
+            <ScrollView style={styles.modalSuggestions}>
+              {destSuggestions.map((s, i) => (
+                <TouchableOpacity key={i} style={styles.modalSuggItem} onPress={() => handleDestinationChange(s)}>
+                  <Ionicons name="location-outline" size={18} color={COLORS.textSecondary} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.modalSuggMain} numberOfLines={1}>{s.structured_formatting?.main_text || s.description}</Text>
+                    <Text style={styles.modalSuggSub} numberOfLines={1}>{s.structured_formatting?.secondary_text || ''}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -621,4 +742,38 @@ const styles = StyleSheet.create({
     borderRadius: SIZES.radius, marginTop: 16, width: '100%',
   },
   sosBtnText: { color: COLORS.white, fontSize: SIZES.sm, fontWeight: '700', letterSpacing: 1 },
+
+  // Rating
+  rateLabel: { fontSize: SIZES.sm, color: COLORS.textSecondary, fontWeight: '600', marginTop: 16, marginBottom: 8 },
+  starsRow: { flexDirection: 'row', gap: 8 },
+
+  // Change Destination
+  changeDestBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: COLORS.primary + '10', paddingVertical: 14,
+    borderRadius: SIZES.radius, marginTop: 12, width: '100%',
+    borderWidth: 1, borderColor: COLORS.primary + '30',
+  },
+  changeDestText: { color: COLORS.primary, fontSize: SIZES.sm, fontWeight: '700' },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalContent: {
+    backgroundColor: COLORS.white, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40, maxHeight: '80%',
+  },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  modalTitle: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.text },
+  modalInput: {
+    backgroundColor: COLORS.inputBg, borderRadius: SIZES.radius, paddingHorizontal: 16,
+    paddingVertical: 14, fontSize: SIZES.md, fontWeight: '500', borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalSuggestions: { marginTop: 12 },
+  modalSuggItem: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 14,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border,
+  },
+  modalSuggMain: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text },
+  modalSuggSub: { fontSize: SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
 });

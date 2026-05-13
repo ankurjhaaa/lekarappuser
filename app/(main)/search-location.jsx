@@ -17,11 +17,12 @@ import { placesAPI } from '../../src/api/places';
 import useRideStore from '../../src/store/rideStore';
 
 export default function SearchLocationScreen() {
-  const { pickup, setPickup, setDrop } = useRideStore();
+  const { pickup, drop, setPickup, setDrop } = useRideStore();
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchType, setSearchType] = useState('drop'); // 'pickup' or 'drop'
+  const [suggestions, setSuggestions] = useState([]);
   const inputRef = useRef(null);
   const debounceRef = useRef(null);
 
@@ -68,10 +69,16 @@ export default function SearchLocationScreen() {
           setDrop(location);
         }
 
-        // If both pickup and drop are set, navigate to ride detail
+        // Navigate to ride-detail only when BOTH are set
         const currentPickup = searchType === 'pickup' ? location : pickup;
-        if (currentPickup?.lat) {
+        const currentDrop = searchType === 'drop' ? location : drop;
+        if (currentPickup?.lat && currentDrop?.lat) {
           router.replace({ pathname: '/(main)/ride-detail' });
+        } else if (searchType === 'pickup') {
+          // Auto switch to drop search after setting pickup
+          setSearchType('drop');
+          setQuery('');
+          setSuggestions([]);
         }
       }
     } catch (e) {

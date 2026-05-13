@@ -69,8 +69,10 @@ export default function LoginScreen() {
     if (password.length < 6) { Alert.alert('Invalid', 'Password must be 6+ chars.'); return; }
     setLoading(true);
     try {
+      console.log('Attempting password login for:', email.trim());
       const res = await authAPI.loginPassword({
-        email, password,
+        email: email.trim(), 
+        password: password.trim(),
         device_name: Platform.OS + '_lekar_user',
         device_type: Platform.OS === 'ios' ? 'ios' : 'android',
       });
@@ -79,6 +81,7 @@ export default function LoginScreen() {
         router.replace('/(main)/(tabs)/home');
       }
     } catch (e) {
+      console.error('Login error detail:', e.response?.data || e.message);
       Alert.alert('Error', e.response?.data?.message || 'Login failed.');
     }
     setLoading(false);

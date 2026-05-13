@@ -23,6 +23,7 @@ api.interceptors.request.use(async (config) => {
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`, config.data || '');
   } catch (e) {
     // Ignore storage errors
   }

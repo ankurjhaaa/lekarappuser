@@ -10,6 +10,7 @@ export const ridesAPI = {
   trackDriver: (id) => api.get(`/rides/${id}/track`),
   cancel: (id, reason) => api.post(`/rides/${id}/cancel`, { cancel_reason: reason }),
   review: (id, rating, comment) => api.post(`/rides/${id}/review`, { rating, comment }),
+  changeDestination: (id, data) => api.post(`/rides/${id}/change-destination`, data),
   history: (page = 1) => api.get('/rides/history', { params: { page } }),
   // SOS
   triggerSos: (data) => api.post('/user/sos', data),
