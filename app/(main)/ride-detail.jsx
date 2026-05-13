@@ -45,11 +45,17 @@ export default function RideDetailScreen() {
   const [driverInfo, setDriverInfo] = useState(null);
   const [driverLoc, setDriverLoc] = useState(null);
   const [driverHeading, setDriverHeading] = useState(0);
+  const [driverETA, setDriverETA] = useState(null); // Minutes until driver arrives
+  const [driverDistanceKm, setDriverDistanceKm] = useState(null); // km driver is away
+  const [liveDistanceKm, setLiveDistanceKm] = useState(null); // live distance during ride
+  const [liveETA, setLiveETA] = useState(null); // live ETA during ride
   const [rating, setRating] = useState(0);
   const [showDestChange, setShowDestChange] = useState(false);
   const [destQuery, setDestQuery] = useState('');
   const [destSuggestions, setDestSuggestions] = useState([]);
   const [destLoading, setDestLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [routeFetchedForStatus, setRouteFetchedForStatus] = useState('');
   const mapRef = useRef(null);
   const pollRef = useRef(null);
   const slideAnim = useRef(new Animated.Value(200)).current;
@@ -73,6 +79,65 @@ export default function RideDetailScreen() {
       Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }).start();
     }
   }, [loading]);
+
+  // Update route geometry based on ride status
+  useEffect(() => {
+    if (!bookingStatus || !currentBooking) return;
+    if (routeFetchedForStatus === bookingStatus && bookingStatus !== 'driver_enroute') return;
+
+    const updateGeometry = async () => {
+      try {
+        if (['driver_enroute', 'arrived_at_pickup'].includes(bookingStatus) && driverLoc) {
+          // Show driver → pickup route with live ETA
+          const pLat = pickup?.lat || currentBooking.pickup_lat;
+          const pLng = pickup?.lng || currentBooking.pickup_lng;
+          const res = await placesAPI.directions(driverLoc.lat, driverLoc.lng, pLat, pLng);
+          if (res.data.success) {
+            setDriverDistanceKm(res.data.distance_km);
+            setDriverETA(res.data.duration_min);
+            if (res.data.geometry) {
+              const coords = decodePolyline(res.data.geometry);
+              setRouteCoords(coords);
+              fitMapToCoords(coords);
+            }
+          }
+          setRouteFetchedForStatus(bookingStatus);
+        } else if (['ride_started', 'otp_verified'].includes(bookingStatus)) {
+          // Show driver → destination route
+          const fromLat = driverLoc?.lat || currentBooking.pickup_lat;
+          const fromLng = driverLoc?.lng || currentBooking.pickup_lng;
+          const toLat = currentBooking.drop_lat;
+          const toLng = currentBooking.drop_lng;
+          if (fromLat && toLat) {
+            const res = await placesAPI.directions(fromLat, fromLng, toLat, toLng);
+            if (res.data.success) {
+              setLiveDistanceKm(res.data.distance_km);
+              setLiveETA(res.data.duration_min);
+              if (res.data.geometry) {
+                const coords = decodePolyline(res.data.geometry);
+                setRouteCoords(coords);
+                fitMapToCoords(coords);
+              }
+            }
+          }
+          setRouteFetchedForStatus(bookingStatus);
+        }
+      } catch (e) { console.warn('Geometry update error:', e); }
+    };
+
+    updateGeometry();
+  }, [bookingStatus, driverLoc]);
+
+  const fitMapToCoords = (coords) => {
+    setTimeout(() => {
+      if (mapRef.current && coords.length > 0) {
+        mapRef.current.fitToCoordinates(coords, {
+          edgePadding: { top: 100, right: 60, bottom: 300, left: 60 },
+          animated: true,
+        });
+      }
+    }, 500);
+  };
 
   const loadRoute = async () => {
     if (!pickup?.lat || !drop?.lat) { setLoading(false); return; }
@@ -134,6 +199,7 @@ export default function RideDetailScreen() {
 
   const startPolling = (bookingId) => {
     if (pollRef.current) clearInterval(pollRef.current);
+    // Polling is ONLY a safety net for missed WebSocket events
     pollRef.current = setInterval(async () => {
       try {
         const res = await ridesAPI.getStatus(bookingId);
@@ -147,7 +213,7 @@ export default function RideDetailScreen() {
           }
         }
       } catch (e) { /* silent */ }
-    }, 5000);
+    }, 60000); // 60s extreme fallback — WebSocket handles everything
   };
 
   const startWebSocket = async (bookingId) => {
@@ -160,6 +226,9 @@ export default function RideDetailScreen() {
         setBookingStatus(data.status);
         setCurrentBooking((prev) => ({ ...prev, ...data }));
         updateFromEvent(data);
+        if (data.driver_profile) {
+          setDriverInfo(data.driver_profile);
+        }
         // Update driver location from status event if available
         if (data.driver_lat && data.driver_lng) {
           setDriverLoc({ lat: data.driver_lat, lng: data.driver_lng });
@@ -260,9 +329,11 @@ export default function RideDetailScreen() {
 
   const getVehicleIcon = (type) => {
     const t = (type || '').toLowerCase();
-    if (t === 'cab') return 'car';
+    if (t === 'bike') return 'bicycle';
     if (t === 'auto') return 'car-sport';
-    return 'bicycle';
+    if (t === 'toto') return 'bus';
+    if (t === 'car' || t === 'cab') return 'car';
+    return 'car';
   };
 
   // Destination change search
@@ -282,8 +353,12 @@ export default function RideDetailScreen() {
       if (!detailRes.data.success) throw new Error('Failed');
       const newLat = detailRes.data.lat;
       const newLng = detailRes.data.lng;
-      // Get new distance from current drop to new drop
-      const dirRes = await placesAPI.directions(pickup.lat, pickup.lng, newLat, newLng);
+      // Distance from DRIVER'S CURRENT LOCATION to new destination
+      // Backend will add distance_traveled for cumulative fare
+      const fromLat = driverLoc?.lat || currentBooking?.pickup_lat || pickup?.lat;
+      const fromLng = driverLoc?.lng || currentBooking?.pickup_lng || pickup?.lng;
+      
+      const dirRes = await placesAPI.directions(fromLat, fromLng, newLat, newLng);
       const newDist = dirRes.data.distance_km || 5;
       const newDur = dirRes.data.duration_min || 0;
       // Call API
@@ -293,18 +368,22 @@ export default function RideDetailScreen() {
         new_drop_lng: newLng,
         new_distance_km: newDist,
         new_duration_min: newDur,
+        new_route_geometry: dirRes.data.geometry || '',
       });
       if (res.data.success) {
         setCurrentBooking(res.data.booking);
         setShowDestChange(false);
         setDestQuery('');
         setDestSuggestions([]);
+        setRouteFetchedForStatus(''); // Force route redraw
         // Update route on map
         if (dirRes.data.geometry) {
           const coords = decodePolyline(dirRes.data.geometry);
           setRouteCoords(coords);
+          setLiveDistanceKm(newDist);
+          setLiveETA(newDur);
         }
-        Alert.alert('Updated', `New fare: ${formatCurrency(res.data.new_fare)}`);
+        Alert.alert('Updated', `New fare: ${formatCurrency(res.data.new_fare)}\nTotal distance: ${formatDistance(res.data.new_distance_km)}`);
       }
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to change destination.');
@@ -316,12 +395,18 @@ export default function RideDetailScreen() {
   const renderStatusUI = () => {
     if (!bookingStatus) return null;
 
-    if (bookingStatus === 'searching_driver') {
+    // SEARCHING: Show for both searching_driver AND driver_assigned (request sent but not accepted)
+    if (bookingStatus === 'searching_driver' || bookingStatus === 'driver_assigned') {
+      const attempt = currentBooking?.current_attempt || 0;
+      const total = currentBooking?.total_drivers_in_queue || 0;
       return (
         <View style={styles.statusCard}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.statusTitle}>Looking for your driver...</Text>
-          <Text style={styles.statusSubtext}>This usually takes 1-3 minutes</Text>
+          {total > 0 && (
+            <Text style={styles.statusSubtext}>Trying driver {Math.min(attempt, total)} of {total}</Text>
+          )}
+          <Text style={[styles.statusSubtext, { marginTop: 4 }]}>This usually takes 1-3 minutes</Text>
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
             <Text style={styles.cancelBtnText}>Cancel Ride</Text>
           </TouchableOpacity>
@@ -329,7 +414,8 @@ export default function RideDetailScreen() {
       );
     }
 
-    if (['driver_enroute', 'arrived_at_pickup', 'driver_assigned'].includes(bookingStatus)) {
+    // DRIVER ACCEPTED: Only show when driver has actually accepted (enroute/arrived)
+    if (['driver_enroute', 'arrived_at_pickup'].includes(bookingStatus)) {
       return (
         <View style={styles.statusCard}>
           <View style={styles.driverCard}>
@@ -337,7 +423,7 @@ export default function RideDetailScreen() {
               <Ionicons name="person" size={24} color={COLORS.white} />
             </View>
             <View style={styles.driverDetails}>
-              <Text style={styles.driverName}>{currentBooking?.driver?.name || 'Driver'}</Text>
+              <Text style={styles.driverName}>{currentBooking?.driver?.name || currentBooking?.driver_name || 'Driver'}</Text>
               <Text style={styles.driverVehicle}>{driverInfo?.vehicle_name || ''} • {driverInfo?.number_plate || ''}</Text>
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={14} color={COLORS.accent} />
@@ -348,6 +434,24 @@ export default function RideDetailScreen() {
               <Ionicons name="call" size={20} color={COLORS.success} />
             </TouchableOpacity>
           </View>
+
+          {/* Live ETA & Distance */}
+          {bookingStatus === 'driver_enroute' && (driverETA || driverDistanceKm) && (
+            <View style={styles.etaBanner}>
+              <View style={styles.etaItem}>
+                <Ionicons name="time-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.etaValue}>{driverETA || '...'} min</Text>
+                <Text style={styles.etaLabel}>away</Text>
+              </View>
+              <View style={styles.etaDivider} />
+              <View style={styles.etaItem}>
+                <Ionicons name="navigate-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.etaValue}>{formatDistance(driverDistanceKm)}</Text>
+                <Text style={styles.etaLabel}>distance</Text>
+              </View>
+            </View>
+          )}
+
           <View style={styles.statusBanner}>
             <Ionicons
               name={bookingStatus === 'arrived_at_pickup' ? 'checkmark-circle' : 'navigate'}
@@ -377,11 +481,24 @@ export default function RideDetailScreen() {
           <View style={styles.ridingInfo}>
             <View style={styles.ridingInfoItem}>
               <Text style={styles.ridingLabel}>Destination</Text>
-              <Text style={styles.ridingValue} numberOfLines={1}>{currentBooking?.drop_location || drop?.address}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={[styles.ridingValue, { flex: 1 }]} numberOfLines={1}>
+                  {currentBooking?.drop_location || drop?.address}
+                </Text>
+                {currentBooking?.segments && currentBooking.segments.length > 0 && (
+                  <TouchableOpacity onPress={() => setShowHistory(true)} style={{ paddingLeft: 8 }}>
+                    <Ionicons name="time-outline" size={20} color={COLORS.primary} />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             <View style={styles.ridingInfoItem}>
-              <Text style={styles.ridingLabel}>Distance</Text>
-              <Text style={styles.ridingValue}>{formatDistance(currentBooking?.distance_km || distance)}</Text>
+              <Text style={styles.ridingLabel}>Remaining</Text>
+              <Text style={styles.ridingValue}>{formatDistance(liveDistanceKm || currentBooking?.distance_km || distance)}</Text>
+            </View>
+            <View style={styles.ridingInfoItem}>
+              <Text style={styles.ridingLabel}>ETA</Text>
+              <Text style={styles.ridingValue}>{liveETA || currentBooking?.duration_min || '...'} min</Text>
             </View>
             <View style={styles.ridingInfoItem}>
               <Text style={styles.ridingLabel}>Fare</Text>
@@ -473,17 +590,17 @@ export default function RideDetailScreen() {
         showsUserLocation
         showsMyLocationButton={false}
       >
-        {/* Pickup/Vehicle Marker */}
-        {pickup?.lat && (
+        {/* Pickup Marker — green dot */}
+        {pickup?.lat && !['ride_started', 'ride_completed'].includes(bookingStatus) && (
           <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
-            <View style={styles.driverMapMarker}>
-              <Ionicons name={getVehicleIcon(selectedVehicle)} size={20} color={COLORS.white} />
+            <View style={styles.pickupMarker}>
+              <View style={styles.pickupDot} />
             </View>
           </Marker>
         )}
 
         {/* Drop Marker */}
-        {drop?.lat && (
+        {drop?.lat && bookingStatus !== 'ride_completed' && (
           <Marker coordinate={{ latitude: drop.lat, longitude: drop.lng }}>
             <View style={styles.dropMarker}><Ionicons name="location" size={24} color={COLORS.primary} /></View>
           </Marker>
@@ -494,8 +611,8 @@ export default function RideDetailScreen() {
           <Polyline coordinates={routeCoords} strokeColor={COLORS.primary} strokeWidth={4} />
         )}
 
-        {/* Driver Marker with heading */}
-        {driverLoc && (
+        {/* Driver Marker — only when driver accepted and location known */}
+        {driverLoc && ['driver_enroute', 'arrived_at_pickup', 'ride_started'].includes(bookingStatus) && (
           <Marker
             coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }}
             rotation={driverHeading}
@@ -503,7 +620,7 @@ export default function RideDetailScreen() {
             anchor={{ x: 0.5, y: 0.5 }}
           >
             <View style={styles.driverMapMarker}>
-              <Ionicons name="car" size={18} color={COLORS.white} />
+              <Ionicons name={getVehicleIcon(driverInfo?.vehicle_type || selectedVehicle)} size={18} color={COLORS.white} />
             </View>
           </Marker>
         )}
@@ -611,6 +728,34 @@ export default function RideDetailScreen() {
                     <Text style={styles.modalSuggSub} numberOfLines={1}>{s.structured_formatting?.secondary_text || ''}</Text>
                   </View>
                 </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Destination History Modal */}
+      <Modal visible={showHistory} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Destination History</Text>
+              <TouchableOpacity onPress={() => setShowHistory(false)}>
+                <Ionicons name="close" size={24} color={COLORS.text} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
+              {currentBooking?.segments?.map((seg, i) => (
+                <View key={i} style={{ flexDirection: 'row', marginBottom: 20 }}>
+                  <View style={{ alignItems: 'center', marginRight: 12 }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: i === currentBooking.segments.length - 1 ? COLORS.primary : COLORS.textSecondary }} />
+                    {i < currentBooking.segments.length - 1 && <View style={{ width: 2, height: 40, backgroundColor: COLORS.border, marginTop: 4 }} />}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: SIZES.sm, color: COLORS.textSecondary }}>{i === 0 ? 'Original Destination' : `Changed Destination ${i}`}</Text>
+                    <Text style={{ fontSize: SIZES.md, color: COLORS.text, fontWeight: '600', marginTop: 2 }}>{seg.to_address}</Text>
+                  </View>
+                </View>
               ))}
             </ScrollView>
           </View>
@@ -776,4 +921,16 @@ const styles = StyleSheet.create({
   },
   modalSuggMain: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text },
   modalSuggSub: { fontSize: SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
+
+  // ETA Banner
+  etaBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: COLORS.primary + '08', borderRadius: SIZES.radius,
+    paddingVertical: 14, paddingHorizontal: 16, marginVertical: 10,
+    borderWidth: 1, borderColor: COLORS.primary + '20',
+  },
+  etaItem: { flex: 1, alignItems: 'center' },
+  etaValue: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.text, marginTop: 4 },
+  etaLabel: { fontSize: SIZES.xs, color: COLORS.textSecondary, fontWeight: '500', marginTop: 2 },
+  etaDivider: { width: 1, height: 40, backgroundColor: COLORS.border },
 });

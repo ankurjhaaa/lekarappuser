@@ -67,17 +67,17 @@ export default function HomeScreen() {
     }
   }, [loading]);
 
-  // Refresh nearby drivers periodically
+  // Refresh nearby drivers periodically — but NOT during active rides
   useEffect(() => {
-    if (!currentLocation) return;
+    if (!currentLocation || activeBooking) return;
     const interval = setInterval(async () => {
       try {
         const res = await ridesAPI.nearbyDrivers(currentLocation.latitude, currentLocation.longitude);
         if (res.data.success) setNearbyDrivers(res.data.drivers || []);
       } catch (e) { /* silent */ }
-    }, 15000);
+    }, 30000); // 30s is enough for nearby drivers
     return () => clearInterval(interval);
-  }, [currentLocation]);
+  }, [currentLocation, activeBooking]);
 
   const handleWhereToPress = () => {
     if (currentLocation) {
@@ -119,8 +119,8 @@ export default function HomeScreen() {
         showsCompass={false}
         customMapStyle={mapStyle}
       >
-        {/* Nearby Driver Markers */}
-        {nearbyDrivers.map((driver, index) => (
+        {/* Nearby Driver Markers — hide during active ride */}
+        {!activeBooking && nearbyDrivers.map((driver, index) => (
           <Marker
             key={`driver-${driver.user_id || index}`}
             coordinate={{ latitude: driver.lat, longitude: driver.lng }}
