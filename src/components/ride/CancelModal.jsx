@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
+import CustomModal from '../CustomModal';
 
 const CANCEL_REASONS = [
   'Driver is too far',
@@ -14,38 +15,35 @@ const CANCEL_REASONS = [
 
 export default function CancelModal({ visible, onClose, onConfirm, loading }) {
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={st.overlay}>
-        <View style={st.container}>
-          <View style={st.handle}><View style={st.handleBar} /></View>
-          <Text style={st.title}>Cancel Ride</Text>
-          <Text style={st.subtitle}>Please select a reason for cancellation</Text>
-          <ScrollView style={st.list} showsVerticalScrollIndicator={false}>
-            {CANCEL_REASONS.map((reason, i) => (
-              <TouchableOpacity
-                key={i}
-                style={st.reasonItem}
-                onPress={() => onConfirm(reason)}
-                disabled={loading}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="radio-button-off" size={20} color={COLORS.textSecondary} />
-                <Text style={st.reasonText}>{reason}</Text>
-                <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          <TouchableOpacity style={st.closeBtn} onPress={onClose}>
-            <Text style={st.closeBtnText}>Don't Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </Modal>
+    <CustomModal visible={visible} onClose={onClose}>
+      <TouchableOpacity activeOpacity={1} style={st.container}>
+        <View style={st.handle}><View style={st.handleBar} /></View>
+        <Text style={st.title}>Cancel Ride</Text>
+        <Text style={st.subtitle}>Please select a reason for cancellation</Text>
+        <ScrollView style={st.list} showsVerticalScrollIndicator={false}>
+          {CANCEL_REASONS.map((reason, i) => (
+            <TouchableOpacity
+              key={i}
+              style={st.reasonItem}
+              onPress={() => onConfirm(reason)}
+              disabled={loading}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="radio-button-off" size={20} color={COLORS.textSecondary} />
+              <Text style={st.reasonText}>{reason}</Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+        <TouchableOpacity style={st.closeBtn} onPress={onClose}>
+          <Text style={st.closeBtnText}>Don't Cancel</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </CustomModal>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   container: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34, maxHeight: '75%' },
   handle: { alignItems: 'center', paddingVertical: 10 },
   handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },

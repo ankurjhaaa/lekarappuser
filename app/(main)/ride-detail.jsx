@@ -27,6 +27,7 @@ import { subscribeToBooking, unsubscribeFromBooking, initWebSocket } from '../..
 import CancelModal from '../../src/components/ride/CancelModal';
 import DriverDetailModal from '../../src/components/ride/DriverDetailModal';
 import ChatModal from '../../src/components/ride/ChatModal';
+import CustomModal from '../../src/components/CustomModal';
 import * as Location from 'expo-location';
 
 const { width, height } = Dimensions.get('window');
@@ -386,6 +387,14 @@ export default function RideDetailScreen() {
       });
       if (res.data.success) {
         setCurrentBooking(prev => ({ ...prev, ...res.data.booking, drop_location: place.description }));
+        
+        // Update local store so the map marker reflects the new destination!
+        useRideStore.getState().setDrop({
+          address: place.description,
+          lat: newLat,
+          lng: newLng,
+        });
+
         setShowDestChange(false);
         setDestQuery('');
         setDestSuggestions([]);
@@ -718,61 +727,51 @@ export default function RideDetailScreen() {
       </View>
 
       {/* Destination Change Modal */}
-      <Modal visible={showDestChange} animationType="fade" transparent>
-        <View style={s.modalOverlay}>
-          <View style={s.modalSheet}>
-            <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Change Destination</Text>
-              <TouchableOpacity onPress={() => { setShowDestChange(false); setDestQuery(''); setDestSuggestions([]); }}>
-                <Ionicons name="close-circle" size={28} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </View>
-            <TextInput style={s.modalInput} placeholder="Search new destination..." placeholderTextColor={COLORS.textLight} value={destQuery} onChangeText={searchDestination} autoFocus />
-            {destLoading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
-            <ScrollView style={s.modalSuggestions}>
-              {destSuggestions.map((sg, i) => (
-                <TouchableOpacity key={i} style={s.modalSuggItem} onPress={() => handleDestinationChange(sg)}>
-                  <Ionicons name="location-outline" size={18} color={COLORS.primary} />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={s.modalSuggMain} numberOfLines={1}>{sg.structured_formatting?.main_text || sg.description}</Text>
-                    <Text style={s.modalSuggSub} numberOfLines={1}>{sg.structured_formatting?.secondary_text || ''}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+      <CustomModal visible={showDestChange} onClose={() => { setShowDestChange(false); setDestQuery(''); setDestSuggestions([]); }}>
+        <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
+          <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Change Destination</Text>
           </View>
-        </View>
-      </Modal>
+          <TextInput style={s.modalInput} placeholder="Search new destination..." placeholderTextColor={COLORS.textLight} value={destQuery} onChangeText={searchDestination} autoFocus />
+          {destLoading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
+          <ScrollView style={s.modalSuggestions}>
+            {destSuggestions.map((sg, i) => (
+              <TouchableOpacity key={i} style={s.modalSuggItem} onPress={() => handleDestinationChange(sg)}>
+                <Ionicons name="location-outline" size={18} color={COLORS.primary} />
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.modalSuggMain} numberOfLines={1}>{sg.structured_formatting?.main_text || sg.description}</Text>
+                  <Text style={s.modalSuggSub} numberOfLines={1}>{sg.structured_formatting?.secondary_text || ''}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </TouchableOpacity>
+      </CustomModal>
 
       {/* Destination History Modal */}
-      <Modal visible={showHistory} animationType="fade" transparent>
-        <View style={s.modalOverlay}>
-          <View style={s.modalSheet}>
-            <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
-            <View style={s.modalHeader}>
-              <Text style={s.modalTitle}>Destination History</Text>
-              <TouchableOpacity onPress={() => setShowHistory(false)}>
-                <Ionicons name="close-circle" size={28} color={COLORS.textLight} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
-              {currentBooking?.segments?.map((seg, i) => (
-                <View key={i} style={{ flexDirection: 'row', marginBottom: 16 }}>
-                  <View style={{ alignItems: 'center', marginRight: 12 }}>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: i === currentBooking.segments.length - 1 ? COLORS.primary : COLORS.textLight }} />
-                    {i < currentBooking.segments.length - 1 && <View style={{ width: 2, height: 36, backgroundColor: COLORS.border, marginTop: 4 }} />}
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>{i === 0 ? 'Original' : `Change ${i}`}</Text>
-                    <Text style={{ fontSize: SIZES.md, color: COLORS.text, fontWeight: '600', marginTop: 2 }}>{seg.to_address}</Text>
-                  </View>
-                </View>
-              ))}
-            </ScrollView>
+      <CustomModal visible={showHistory} onClose={() => setShowHistory(false)}>
+        <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
+          <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Destination History</Text>
           </View>
-        </View>
-      </Modal>
+          <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
+            {currentBooking?.segments?.map((seg, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 16 }}>
+                <View style={{ alignItems: 'center', marginRight: 12 }}>
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: i === currentBooking.segments.length - 1 ? COLORS.primary : COLORS.textLight }} />
+                  {i < currentBooking.segments.length - 1 && <View style={{ width: 2, height: 36, backgroundColor: COLORS.border, marginTop: 4 }} />}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: COLORS.textSecondary }}>{i === 0 ? 'Original' : `Change ${i}`}</Text>
+                  <Text style={{ fontSize: SIZES.md, color: COLORS.text, fontWeight: '600', marginTop: 2 }}>{seg.to_address}</Text>
+                </View>
+              </View>
+            ))}
+          </ScrollView>
+        </TouchableOpacity>
+      </CustomModal>
 
       {/* Cancel Reason Modal */}
       <CancelModal visible={showCancel} onClose={() => setShowCancel(false)} onConfirm={confirmCancel} />

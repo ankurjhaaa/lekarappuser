@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { formatCurrency, formatDistance } from '../../utils/helpers';
+import CustomModal from '../CustomModal';
 
 export default function DriverDetailModal({ visible, onClose, booking, driverInfo }) {
   if (!booking) return null;
@@ -9,87 +10,84 @@ export default function DriverDetailModal({ visible, onClose, booking, driverInf
   const phone = booking?.driver?.phone || booking?.driver_phone;
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={st.overlay}>
-        <View style={st.container}>
-          <View style={st.handle}><View style={st.handleBar} /></View>
+    <CustomModal visible={visible} onClose={onClose}>
+      <TouchableOpacity activeOpacity={1} style={st.container}>
+        <View style={st.handle}><View style={st.handleBar} /></View>
 
-          {/* Driver Profile */}
-          <View style={st.profileRow}>
-            <View style={st.avatar}>
-              <Ionicons name="person" size={32} color={COLORS.white} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 16 }}>
-              <Text style={st.name}>{driverName}</Text>
-              <View style={st.metaRow}>
-                <View style={st.ratingBadge}>
-                  <Ionicons name="star" size={12} color="#fff" />
-                  <Text style={st.ratingText}>{driverInfo?.rating || '5.0'}</Text>
-                </View>
-                <Text style={st.vehicleType}>{driverInfo?.vehicle_type || booking?.vehicle_type || ''}</Text>
+        {/* Driver Profile */}
+        <View style={st.profileRow}>
+          <View style={st.avatar}>
+            <Ionicons name="person" size={32} color={COLORS.white} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 16 }}>
+            <Text style={st.name}>{driverName}</Text>
+            <View style={st.metaRow}>
+              <View style={st.ratingBadge}>
+                <Ionicons name="star" size={12} color="#fff" />
+                <Text style={st.ratingText}>{driverInfo?.rating || '5.0'}</Text>
               </View>
-            </View>
-            {phone && (
-              <TouchableOpacity style={st.callBtn} onPress={() => Linking.openURL(`tel:${phone}`)}>
-                <Ionicons name="call" size={22} color={COLORS.success} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Vehicle Info */}
-          <View style={st.infoCard}>
-            <View style={st.infoRow}>
-              <Ionicons name="car-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={st.infoLabel}>Vehicle</Text>
-              <Text style={st.infoValue}>{driverInfo?.vehicle_name || booking?.vehicle_type || '--'}</Text>
-            </View>
-            <View style={st.infoRow}>
-              <Ionicons name="document-text-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={st.infoLabel}>Number Plate</Text>
-              <Text style={[st.infoValue, { fontWeight: '900', letterSpacing: 1 }]}>{driverInfo?.number_plate || '--'}</Text>
+              <Text style={st.vehicleType}>{driverInfo?.vehicle_type || booking?.vehicle_type || ''}</Text>
             </View>
           </View>
-
-          {/* Trip Info */}
-          <View style={st.infoCard}>
-            <View style={st.infoRow}>
-              <Ionicons name="location-outline" size={20} color={COLORS.success} />
-              <Text style={st.infoLabel}>Pickup</Text>
-              <Text style={st.infoValue} numberOfLines={1}>{booking?.pickup_location || '--'}</Text>
-            </View>
-            <View style={st.infoRow}>
-              <Ionicons name="navigate-outline" size={20} color={COLORS.primary} />
-              <Text style={st.infoLabel}>Drop</Text>
-              <Text style={st.infoValue} numberOfLines={1}>{booking?.drop_location || '--'}</Text>
-            </View>
-            <View style={st.infoRow}>
-              <Ionicons name="speedometer-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={st.infoLabel}>Distance</Text>
-              <Text style={st.infoValue}>{formatDistance(booking?.distance_km)}</Text>
-            </View>
-            <View style={st.infoRow}>
-              <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
-              <Text style={st.infoLabel}>Fare</Text>
-              <Text style={[st.infoValue, { color: COLORS.primary, fontWeight: '800' }]}>{formatCurrency(booking?.fare_total)}</Text>
-            </View>
-            <View style={st.infoRow}>
-              <Ionicons name="wallet-outline" size={20} color={COLORS.textSecondary} />
-              <Text style={st.infoLabel}>Payment</Text>
-              <Text style={st.infoValue}>{booking?.payment_method === 'cash' ? 'Cash' : 'Online'}</Text>
-            </View>
-          </View>
-
-          <TouchableOpacity style={st.closeBtn} onPress={onClose}>
-            <Text style={st.closeBtnText}>Close</Text>
-          </TouchableOpacity>
+          {phone && (
+            <TouchableOpacity style={st.callBtn} onPress={() => Linking.openURL(`tel:${phone}`)}>
+              <Ionicons name="call" size={22} color={COLORS.success} />
+            </TouchableOpacity>
+          )}
         </View>
-      </View>
-    </Modal>
+
+        {/* Vehicle Info */}
+        <View style={st.infoCard}>
+          <View style={st.infoRow}>
+            <Ionicons name="car-outline" size={20} color={COLORS.textSecondary} />
+            <Text style={st.infoLabel}>Vehicle</Text>
+            <Text style={st.infoValue}>{driverInfo?.vehicle_name || booking?.vehicle_type || '--'}</Text>
+          </View>
+          <View style={st.infoRow}>
+            <Ionicons name="document-text-outline" size={20} color={COLORS.textSecondary} />
+            <Text style={st.infoLabel}>Number Plate</Text>
+            <Text style={[st.infoValue, { fontWeight: '900', letterSpacing: 1 }]}>{driverInfo?.number_plate || '--'}</Text>
+          </View>
+        </View>
+
+        {/* Trip Info */}
+        <View style={st.infoCard}>
+          <View style={st.infoRow}>
+            <Ionicons name="location-outline" size={20} color={COLORS.success} />
+            <Text style={st.infoLabel}>Pickup</Text>
+            <Text style={st.infoValue} numberOfLines={1}>{booking?.pickup_location || '--'}</Text>
+          </View>
+          <View style={st.infoRow}>
+            <Ionicons name="navigate-outline" size={20} color={COLORS.primary} />
+            <Text style={st.infoLabel}>Drop</Text>
+            <Text style={st.infoValue} numberOfLines={1}>{booking?.drop_location || '--'}</Text>
+          </View>
+          <View style={st.infoRow}>
+            <Ionicons name="speedometer-outline" size={20} color={COLORS.textSecondary} />
+            <Text style={st.infoLabel}>Distance</Text>
+            <Text style={st.infoValue}>{formatDistance(booking?.distance_km)}</Text>
+          </View>
+          <View style={st.infoRow}>
+            <Ionicons name="cash-outline" size={20} color={COLORS.primary} />
+            <Text style={st.infoLabel}>Fare</Text>
+            <Text style={[st.infoValue, { color: COLORS.primary, fontWeight: '800' }]}>{formatCurrency(booking?.fare_total)}</Text>
+          </View>
+          <View style={st.infoRow}>
+            <Ionicons name="wallet-outline" size={20} color={COLORS.textSecondary} />
+            <Text style={st.infoLabel}>Payment</Text>
+            <Text style={st.infoValue}>{booking?.payment_method === 'cash' ? 'Cash' : 'Online'}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity style={st.closeBtn} onPress={onClose}>
+          <Text style={st.closeBtnText}>Close</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </CustomModal>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   container: { backgroundColor: COLORS.white, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 34, maxHeight: '85%' },
   handle: { alignItems: 'center', paddingVertical: 10 },
   handleBar: { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
