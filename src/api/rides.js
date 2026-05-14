@@ -14,6 +14,9 @@ export const ridesAPI = {
   history: (page = 1) => api.get('/rides/history', { params: { page } }),
   // SOS
   triggerSos: (data) => api.post('/user/sos', data),
+  // Chat
+  getMessages: (bookingId) => api.get(`/rides/${bookingId}/chat`),
+  sendMessage: (bookingId, message) => api.post(`/rides/${bookingId}/chat`, { message }),
   // Coupons
   getCoupons: () => api.get('/user/coupons'),
   applyCoupon: (code, fare) => api.post('/user/coupons/apply', { code, fare }),

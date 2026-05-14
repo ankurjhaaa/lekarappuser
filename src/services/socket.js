@@ -66,7 +66,7 @@ export const initWebSocket = async () => {
  * @param {function} onStatusUpdate - called when booking status changes
  * @param {function} onDriverLocation - called with driver's live GPS (lat, lng, heading)
  */
-export const subscribeToBooking = (bookingId, onStatusUpdate, onDriverLocation = null) => {
+export const subscribeToBooking = (bookingId, onStatusUpdate, onDriverLocation = null, onChatMessage = null) => {
   if (!pusherInstance) return null;
   const channel = pusherInstance.subscribe(`private-booking.${bookingId}`);
 
@@ -80,6 +80,14 @@ export const subscribeToBooking = (bookingId, onStatusUpdate, onDriverLocation =
   if (onDriverLocation) {
     channel.bind('.DriverLocationUpdated', (data) => {
       onDriverLocation(data);
+    });
+  }
+
+  // Chat messages
+  if (onChatMessage) {
+    channel.bind('ChatMessageSent', (data) => {
+      console.log('[WS] ChatMessage:', data);
+      onChatMessage(data.message || data);
     });
   }
 
