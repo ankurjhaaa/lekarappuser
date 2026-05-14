@@ -15,7 +15,6 @@ import {
   Linking,
   Platform,
 } from 'react-native';
-import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../src/components/MapViewSafe';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -635,90 +634,88 @@ export default function RideDetailScreen() {
   );
 
   return (
-    <View style={s.container}>
-      <MapView
-        ref={mapRef}
-        style={StyleSheet.absoluteFillObject}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={{
-          latitude: pickup?.lat || 25.6117, longitude: pickup?.lng || 85.1441,
-          latitudeDelta: 0.03, longitudeDelta: 0.03,
-        }}
-        showsUserLocation showsMyLocationButton={false}
-      >
-        {pickup?.lat && !['ride_started', 'ride_completed'].includes(bookingStatus) && (
-          <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
-            <View style={s.pickupMarker}><View style={s.pickupDot} /></View>
-          </Marker>
-        )}
-        {drop?.lat && bookingStatus !== 'ride_completed' && (
-          <Marker coordinate={{ latitude: drop.lat, longitude: drop.lng }}>
-            <View style={s.dropMarker}><Ionicons name="location" size={28} color={COLORS.primary} /></View>
-          </Marker>
-        )}
-        {routeCoords.length > 0 && <Polyline coordinates={routeCoords} strokeColor={COLORS.primary} strokeWidth={4} />}
-        {driverLoc && ['driver_enroute', 'arrived_at_pickup', 'ride_started'].includes(bookingStatus) && (
-          <Marker coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }} rotation={driverHeading} flat anchor={{ x: 0.5, y: 0.5 }}>
-            <View style={s.driverMapMarker}><Ionicons name={getVehicleIcon(driverInfo?.vehicle_type || selectedVehicle)} size={18} color={COLORS.white} /></View>
-          </Marker>
-        )}
-      </MapView>
+    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
+      {/* TOP HALF: MAP */}
+      <View style={s.mapContainer}>
+        <MapView
+          ref={mapRef}
+          style={StyleSheet.absoluteFillObject}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={{
+            latitude: pickup?.lat || 25.6117, longitude: pickup?.lng || 85.1441,
+            latitudeDelta: 0.03, longitudeDelta: 0.03,
+          }}
+          showsUserLocation showsMyLocationButton={false}
+        >
+          {pickup?.lat && !['ride_started', 'ride_completed'].includes(bookingStatus) && (
+            <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
+              <View style={s.pickupMarker}><View style={s.pickupDot} /></View>
+            </Marker>
+          )}
+          {drop?.lat && bookingStatus !== 'ride_completed' && (
+            <Marker coordinate={{ latitude: drop.lat, longitude: drop.lng }}>
+              <View style={s.dropMarker}><Ionicons name="location" size={28} color={COLORS.primary} /></View>
+            </Marker>
+          )}
+          {routeCoords.length > 0 && <Polyline coordinates={routeCoords} strokeColor={COLORS.primary} strokeWidth={4} />}
+          {driverLoc && ['driver_enroute', 'arrived_at_pickup', 'ride_started'].includes(bookingStatus) && (
+            <Marker coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }} rotation={driverHeading} flat anchor={{ x: 0.5, y: 0.5 }}>
+              <View style={s.driverMapMarker}><Ionicons name={getVehicleIcon(driverInfo?.vehicle_type || selectedVehicle)} size={18} color={COLORS.white} /></View>
+            </Marker>
+          )}
+        </MapView>
 
-      <SafeAreaView style={s.topOverlay}>
-        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-        </TouchableOpacity>
-      </SafeAreaView>
+        <View style={s.topOverlay}>
+          <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      {/* POST-BOOKING: Full white status panel */}
-      {bookingStatus ? (
-        <View style={s.statusPanel}>
+      {/* BOTTOM HALF: CONTENT */}
+      <View style={s.contentContainer}>
+        {bookingStatus ? (
           <ScrollView contentContainerStyle={s.statusPanelInner} showsVerticalScrollIndicator={false}>
             {renderStatusUI()}
             {renderAds()}
           </ScrollView>
-        </View>
-      ) : (
-        /* PRE-BOOKING: Bottom Sheet */
-        <BottomSheet
-          ref={bottomSheetRef} index={1} snapPoints={snapPoints}
-          enablePanDownToClose={false} backgroundStyle={s.sheetBg}
-          handleIndicatorStyle={s.sheetIndicator} handleStyle={s.sheetHandleArea}
-        >
-          <BottomSheetScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
-            {(estimates.length > 0 ? estimates : [
-              { vehicle: { name: 'Bike' }, fare: 0, eta_min: null },
-              { vehicle: { name: 'Auto' }, fare: 0, eta_min: null },
-              { vehicle: { name: 'Cab' }, fare: 0, eta_min: null },
-            ]).map((est, i) => {
-              const name = est.vehicle?.name || 'Bike';
-              const isSelected = name.toLowerCase() === selectedVehicle.toLowerCase();
-              return (
-                <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
-                  <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={26} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
-                    <Text style={s.vSub}>{est.eta_min ? `${est.eta_min} min` : 'Quick rides'} • {formatDuration(duration)}</Text>
-                  </View>
-                  <Text style={[s.vFare, isSelected && { color: COLORS.primary }]}>{est.fare ? formatCurrency(est.fare) : '--'}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </BottomSheetScrollView>
-          <View style={s.bookBar}>
-            <TouchableOpacity style={s.cashBtn}>
-              <Ionicons name="cash-outline" size={16} color={COLORS.text} />
-              <Text style={s.cashBtnText}>Cash</Text>
-              <Ionicons name="chevron-forward" size={12} color={COLORS.textLight} />
-            </TouchableOpacity>
-            <TouchableOpacity style={s.bookBtn} onPress={handleBook} disabled={booking || !drop?.lat} activeOpacity={0.8}>
-              {booking ? <ActivityIndicator color="#fff" /> : (
-                <Text style={s.bookBtnText}>Book {selectedVehicle.charAt(0).toUpperCase() + selectedVehicle.slice(1)}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </BottomSheet>
-      )}
+        ) : (
+          <>
+            <ScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
+              {(estimates.length > 0 ? estimates : [
+                { vehicle: { name: 'Bike' }, fare: 0, eta_min: null },
+                { vehicle: { name: 'Auto' }, fare: 0, eta_min: null },
+                { vehicle: { name: 'Cab' }, fare: 0, eta_min: null },
+              ]).map((est, i) => {
+                const name = est.vehicle?.name || 'Bike';
+                const isSelected = name.toLowerCase() === selectedVehicle.toLowerCase();
+                return (
+                  <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
+                    <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={26} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
+                      <Text style={s.vSub}>{est.eta_min ? `${est.eta_min} min` : 'Quick rides'} • {formatDuration(duration)}</Text>
+                    </View>
+                    <Text style={[s.vFare, isSelected && { color: COLORS.primary }]}>{est.fare ? formatCurrency(est.fare) : '--'}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={s.bookBar}>
+              <TouchableOpacity style={s.cashBtn}>
+                <Ionicons name="cash-outline" size={16} color={COLORS.text} />
+                <Text style={s.cashBtnText}>Cash</Text>
+                <Ionicons name="chevron-forward" size={12} color={COLORS.textLight} />
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bookBtn} onPress={handleBook} disabled={booking || !drop?.lat} activeOpacity={0.8}>
+                {booking ? <ActivityIndicator color="#fff" /> : (
+                  <Text style={s.bookBtnText}>Book {selectedVehicle.charAt(0).toUpperCase() + selectedVehicle.slice(1)}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
 
       {/* Destination Change Modal */}
       <Modal visible={showDestChange} animationType="fade" transparent>
@@ -791,12 +788,14 @@ export default function RideDetailScreen() {
         driverName={currentBooking?.driver?.name || currentBooking?.driver_name || 'Captain'}
         onNewMessage={chatMsgRef}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  mapContainer: { height: '50%', width: '100%' },
+  contentContainer: { height: '50%', width: '100%', backgroundColor: '#fff' },
   pickupMarker: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#06D6A020', justifyContent: 'center', alignItems: 'center' },
   pickupDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.success, borderWidth: 2, borderColor: '#fff' },
   dropMarker: { alignItems: 'center' },
@@ -804,15 +803,11 @@ const s = StyleSheet.create({
   topOverlay: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10 },
   backBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', marginLeft: 16, marginTop: 10, ...SHADOWS.medium },
 
-  // Status panel (full view after booking — separate from bottom sheet)
-  statusPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, maxHeight: '55%', backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, ...SHADOWS.large },
+  // Status panel (full view after booking)
   statusPanelInner: { padding: 20, paddingBottom: 30 },
 
-  // Bottom sheet (pre-booking only)
-  sheetBg: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, ...SHADOWS.large },
-  sheetIndicator: { backgroundColor: COLORS.border, width: 36, height: 4, borderRadius: 2 },
-  sheetHandleArea: { paddingTop: 8, paddingBottom: 0 },
-  sheetContent: { paddingHorizontal: 16, paddingBottom: 10 },
+  // Content (pre-booking)
+  sheetContent: { paddingHorizontal: 16, paddingBottom: 10, paddingTop: 16 },
 
   // Vehicle rows
   vRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.5, borderColor: 'transparent', marginBottom: 2 },
@@ -822,8 +817,8 @@ const s = StyleSheet.create({
   vSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 1 },
   vFare: { fontSize: SIZES.lg, fontWeight: '800', color: COLORS.text },
 
-  // Book bar (fixed at bottom of BottomSheet)
-  bookBar: { paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 30 : 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border + '50', backgroundColor: '#fff' },
+  // Book bar (fixed at bottom)
+  bookBar: { paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 10 : 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border + '50', backgroundColor: '#fff' },
   cashBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, alignSelf: 'flex-start', marginBottom: 10 },
   cashBtnText: { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.text },
   bookBtn: { backgroundColor: COLORS.primary, paddingVertical: 15, borderRadius: 12, alignItems: 'center' },

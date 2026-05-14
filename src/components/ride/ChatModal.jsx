@@ -3,6 +3,7 @@ import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, Modal,
   FlatList, KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES } from '../../constants/theme';
 import { ridesAPI } from '../../api/rides';
@@ -41,7 +42,18 @@ export default function ChatModal({ visible, onClose, bookingId, driverName, onN
   // Called from parent when WebSocket message arrives
   const addMessage = (msg) => {
     setMessages(prev => {
-      if (prev.find(m => m.id === msg.id)) return prev;
+      if (prev.find(m => String(m.id) === String(msg.id))) return prev;
+      
+      // Prevent duplication of optimistic messages if WS arrives before API response
+      if (msg.sender_type === 'user') {
+        const tempIdx = prev.findIndex(m => String(m.id).startsWith('temp_') && m.message === msg.message);
+        if (tempIdx !== -1) {
+          const next = [...prev];
+          next[tempIdx] = msg;
+          return next;
+        }
+      }
+      
       return [...prev, msg];
     });
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
@@ -71,10 +83,14 @@ export default function ChatModal({ visible, onClose, bookingId, driverName, onN
     try {
       const res = await ridesAPI.sendMessage(bookingId, msgText);
       if (res.data.success) {
-        // Replace temp with real message
-        setMessages(prev =>
-          prev.map(m => m.id === tempMsg.id ? res.data.message : m)
-        );
+        setMessages(prev => {
+          const newMsg = res.data.message;
+          const filtered = prev.filter(m => m.id !== tempMsg.id);
+          if (filtered.some(m => String(m.id) === String(newMsg.id))) {
+            return filtered;
+          }
+          return [...filtered, newMsg];
+        });
       }
     } catch (e) {
       // Remove failed temp message
@@ -100,12 +116,13 @@ export default function ChatModal({ visible, onClose, bookingId, driverName, onN
   };
 
   return (
-    <Modal visible={visible} animationType="fade" transparent>
-      <KeyboardAvoidingView
-        style={st.overlay}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={st.container}>
+    <Modal visible={visible} animationType="slide" transparent={false}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
+        <KeyboardAvoidingView
+          style={st.overlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <View style={st.container}>
           {/* Header */}
           <View style={st.header}>
             <TouchableOpacity onPress={onClose} style={st.headerBack}>
@@ -169,15 +186,16 @@ export default function ChatModal({ visible, onClose, bookingId, driverName, onN
               )}
             </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  container: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, height: '85%' },
+  overlay: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#fff' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border + '50' },
   headerBack: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   headerInfo: { flexDirection: 'row', alignItems: 'center', marginLeft: 8, gap: 10 },

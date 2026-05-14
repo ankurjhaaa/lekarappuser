@@ -100,7 +100,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       {/* Map */}
       <MapView
         ref={mapRef}
@@ -211,7 +211,7 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </Animated.View>
-    </View>
+    </SafeAreaView>
   );
 }
 
