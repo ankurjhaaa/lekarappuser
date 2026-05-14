@@ -13,9 +13,12 @@ import { Platform } from 'react-native';
  * ──────────────────────────────────────────────────────────
  */
 
-// Your computer's local network IP — both emulator & physical device will work
-// Your computer's local network IP — both emulator & physical device will work
-const HOST = '10.158.108.98';
+import Constants from 'expo-constants';
+
+// Automatically detect the local IP address of the machine running the Expo server
+// This prevents you from having to manually change the IP every time it changes.
+const hostUri = Constants.expoConfig?.hostUri;
+const HOST = hostUri ? hostUri.split(':')[0] : '192.168.29.128';
 
 export const CONFIG = {
   // API Base URL
