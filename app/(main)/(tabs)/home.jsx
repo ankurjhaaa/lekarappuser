@@ -1,26 +1,25 @@
-import { useState, useEffect, useRef } from 'react';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Dimensions,
-  Animated,
-  Platform,
-  ActivityIndicator,
-  StatusBar,
-} from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from '../../../src/components/MapViewSafe';
+import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SIZES, SHADOWS } from '../../../src/constants/theme';
+import { useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ridesAPI } from '../../../src/api/rides';
-import useRideStore from '../../../src/store/rideStore';
+import MapView, { Marker, PROVIDER_GOOGLE } from '../../../src/components/MapViewSafe';
+import SavedLocationModal from '../../../src/components/SavedLocationModal';
+import { COLORS, SHADOWS, SIZES } from '../../../src/constants/theme';
 import useAuthStore from '../../../src/store/authStore';
-import LekarHeader from '../../../src/components/LekarHeader';
-import SidebarMenu from '../../../src/components/SidebarMenu';
+import useRideStore from '../../../src/store/rideStore';
+import useUserStore from '../../../src/store/userStore';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -29,13 +28,23 @@ const LONGITUDE_DELTA = LATITUDE_DELTA * ASPECT_RATIO;
 
 export default function HomeScreen() {
   const user = useAuthStore((s) => s.user);
-  const { nearbyDrivers, setNearbyDrivers, setPickup } = useRideStore();
+  const { nearbyDrivers, setNearbyDrivers, setPickup, setDrop } = useRideStore();
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [currentAddress, setCurrentAddress] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeBooking, setActiveBooking] = useState(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalInitialData, setModalInitialData] = useState(null);
+
+  const { savedPlaces, fetchSavedPlaces, addSavedPlace } = useUserStore();
   const mapRef = useRef(null);
-  const slideAnim = useRef(new Animated.Value(0)).current; // Initialize to 0 for immediate visibility
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Fetch saved places on mount
+  useEffect(() => {
+    fetchSavedPlaces();
+  }, []);
 
   // Get current location
   useEffect(() => {
@@ -60,6 +69,12 @@ export default function HomeScreen() {
       try {
         const res = await ridesAPI.getActive();
         if (res.data.booking) setActiveBooking(res.data.booking);
+      } catch (e) { /* silent */ }
+
+      // Get Address for current location
+      try {
+        const res = await placesAPI.reverseGeocode(coords.latitude, coords.longitude);
+        if (res.data.success) setCurrentAddress(res.data.address);
       } catch (e) { /* silent */ }
     })();
   }, []);
@@ -100,6 +115,50 @@ export default function HomeScreen() {
     router.push('/(main)/search-location');
   };
 
+  const handleQuickAction = (type) => {
+    if (type === 'saved') {
+      router.push('/(main)/search-location');
+      return;
+    }
+
+    const place = savedPlaces.find(p => p.label.toLowerCase() === type.toLowerCase());
+    if (place) {
+      // Initiate ride to saved place
+      if (currentLocation) {
+        setPickup({
+          lat: currentLocation.latitude,
+          lng: currentLocation.longitude,
+          address: 'Current Location',
+        });
+        setDrop({
+          lat: parseFloat(place.lat),
+          lng: parseFloat(place.lng),
+          address: place.address,
+        });
+        router.push('/(main)/ride-detail');
+      }
+    } else {
+      // Set the location with current address as default
+      setModalInitialData({
+        label: type.charAt(0).toUpperCase() + type.slice(1),
+        address: currentAddress || 'Current Location',
+        lat: currentLocation?.latitude,
+        lng: currentLocation?.longitude,
+        locked: true // Flag to indicate address shouldn't be edited
+      });
+      setModalVisible(true);
+    }
+  };
+
+  const onSaveLocation = async (data) => {
+    try {
+      await addSavedPlace(data);
+      setModalVisible(false);
+    } catch (e) {
+      alert('Failed to save location');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.mapWrapper}>
@@ -137,7 +196,7 @@ export default function HomeScreen() {
           ))}
         </MapView>
 
-        {/* Map Loading Overlay */}
+        {/* Map Loading Overlay (Transparent) */}
         {loading && (
           <View style={styles.mapLoadingOverlay}>
             <ActivityIndicator size="large" color={COLORS.primary} />
@@ -188,19 +247,19 @@ export default function HomeScreen() {
 
         {/* Quick Actions */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickBtn}>
+          <TouchableOpacity style={styles.quickBtn} onPress={() => handleQuickAction('home')}>
             <View style={[styles.quickIcon, { backgroundColor: COLORS.primary + '12' }]}>
               <Ionicons name="home" size={18} color={COLORS.primary} />
             </View>
             <Text style={styles.quickLabel}>Home</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn}>
+          <TouchableOpacity style={styles.quickBtn} onPress={() => handleQuickAction('work')}>
             <View style={[styles.quickIcon, { backgroundColor: '#FFF3E0' }]}>
               <Ionicons name="briefcase" size={18} color="#E65100" />
             </View>
             <Text style={styles.quickLabel}>Work</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickBtn}>
+          <TouchableOpacity style={styles.quickBtn} onPress={() => handleQuickAction('saved')}>
             <View style={[styles.quickIcon, { backgroundColor: '#E8F5E9' }]}>
               <Ionicons name="star" size={18} color="#2E7D32" />
             </View>
@@ -208,6 +267,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </Animated.View>
+
+      <SavedLocationModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        onSave={onSaveLocation}
+        initialData={modalInitialData}
+      />
     </SafeAreaView>
   );
 }
@@ -220,12 +286,12 @@ const mapStyle = [
 ];
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: COLORS.white },
   mapWrapper: { flex: 1, position: 'relative' },
   map: { flex: 1 },
   mapLoadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#f5f5f5', // Solid background instead of transparent during load
+    backgroundColor: 'rgba(255, 255, 255, 0.7)', // Semi-transparent white instead of solid gray
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,

@@ -51,28 +51,35 @@ export default function ProfileScreen() {
                 <Text style={styles.contactText}>+91 {user.phone}</Text>
               </View>
             )}
-            {user?.email && (
+            {/* {user?.email && (
               <View style={styles.contactRow}>
                 <Ionicons name="mail" size={14} color={COLORS.primary} />
                 <Text style={styles.contactText}>{user.email}</Text>
               </View>
-            )}
+            )} */}
           </View>
           <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
         </TouchableOpacity>
 
-        {/* Menu Group 1 */}
+        {/* Menu Group 1: Account */}
         <View style={styles.menuCard}>
           <MenuItem icon="person-outline" label="Personal Information" color={COLORS.primary} onPress={() => router.push('/(main)/personal-info')} />
-          <MenuItem icon="car-outline" label="My Vehicles" color={COLORS.primary} onPress={() => router.push('/(main)/my-vehicles')} />
-          <MenuItem icon="wallet-outline" label="Wallet" color={COLORS.primary} rightText="₹0.00" rightColor={COLORS.primary} last />
+          <MenuItem icon="time-outline" label="My Rides" color={COLORS.primary} onPress={() => router.push('/(main)/(tabs)/rides')} />
+          <MenuItem icon="wallet-outline" label="Wallet Balance" color={COLORS.primary} rightText="₹0.00" onPress={() => router.push('/(main)/(tabs)/wallet')} />
+          <MenuItem icon="gift-outline" label="Refer & Earn" color={COLORS.primary} onPress={() => router.push('/(main)/refer-earn')} last />
         </View>
 
-        {/* Menu Group 2 */}
+        {/* Menu Group 2: Support & Settings */}
         <View style={styles.menuCard}>
           <MenuItem icon="headset-outline" label="Help & Support" color={COLORS.primary} onPress={() => router.push('/(main)/help-support')} />
-          <MenuItem icon="shield-outline" label="Safety" color={COLORS.primary} onPress={() => router.push('/(main)/safety')} />
+          <MenuItem icon="shield-checkmark-outline" label="Safety & Emergency" color={COLORS.primary} onPress={() => router.push('/(main)/safety')} />
           <MenuItem icon="settings-outline" label="Settings" color={COLORS.primary} onPress={() => router.push('/(main)/settings')} last />
+        </View>
+
+        {/* Menu Group 3: Others */}
+        <View style={styles.menuCard}>
+          <MenuItem icon="information-circle-outline" label="About Lekar" color={COLORS.primary} onPress={() => router.push('/(main)/about')} />
+          <MenuItem icon="document-text-outline" label="Privacy Policy" color={COLORS.primary} onPress={() => router.push('/(main)/privacy')} last />
         </View>
 
         {/* Logout */}
@@ -97,27 +104,94 @@ function MenuItem({ icon, label, color, rightText, rightColor, last, onPress }) 
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
-  pageTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text },
-  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  editBtnText: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.primary },
-  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, marginHorizontal: 16, borderRadius: SIZES.radiusXl, padding: 16, ...SHADOWS.small },
-  avatarCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
-  profileInfo: { flex: 1, marginLeft: 14 },
-  userName: { fontSize: 20, fontWeight: '800', color: COLORS.text },
+  container: { flex: 1, backgroundColor: '#FDFDFD' },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  pageTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
+  editBtnText: { fontSize: SIZES.md, fontWeight: '700', color: COLORS.primary },
+  
+  // Profile Card
+  profileCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.white, 
+    marginHorizontal: 16, 
+    borderRadius: 12, // Reduced rounding
+    padding: 16, 
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#F1F3F5',
+    ...SHADOWS.small 
+  },
+  avatarCircle: { 
+    width: 68, 
+    height: 68, 
+    borderRadius: 34, 
+    backgroundColor: '#F8F9FA', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  profileInfo: { flex: 1, marginLeft: 16 },
+  userName: { fontSize: 18, fontWeight: '800', color: COLORS.text },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FEF9C3', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  ratingText: { fontSize: SIZES.sm, fontWeight: '700', color: '#92400E' },
-  tripsText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
+  ratingBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 3, 
+    backgroundColor: '#FFFBEB', 
+    paddingHorizontal: 8, 
+    paddingVertical: 2, 
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#FEF3C7',
+  },
+  ratingText: { fontSize: 12, fontWeight: '800', color: '#92400E' },
+  tripsText: { fontSize: 12, color: COLORS.textSecondary, fontWeight: '600' },
   contactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  contactText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
-  menuCard: { backgroundColor: COLORS.white, marginHorizontal: 16, marginTop: 16, borderRadius: SIZES.radiusXl, ...SHADOWS.small },
-  menuItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 17 },
-  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  menuIcon: { width: 30, marginRight: 14 },
-  menuLabel: { flex: 1, fontSize: SIZES.base, fontWeight: '600', color: COLORS.text },
-  menuRight: { fontSize: SIZES.md, fontWeight: '700', marginRight: 8 },
-  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10, marginHorizontal: 16, marginTop: 20, paddingVertical: 16, paddingHorizontal: 18, borderWidth: 1.5, borderColor: COLORS.primary + '30', borderRadius: SIZES.radiusXl },
-  logoutText: { fontSize: SIZES.base, fontWeight: '700', color: COLORS.primary },
+  contactText: { fontSize: 13, color: COLORS.textSecondary, fontWeight: '500' },
+
+  // Menu Section
+  menuCard: { 
+    backgroundColor: COLORS.white, 
+    marginHorizontal: 16, 
+    marginTop: 16, 
+    borderRadius: 12, // Reduced rounding
+    borderWidth: 1,
+    borderColor: '#F1F3F5',
+    ...SHADOWS.small 
+  },
+  menuItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingHorizontal: 16, 
+    paddingVertical: 15,
+  },
+  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: '#F8F9FA' },
+  menuIcon: { width: 28, marginRight: 12 },
+  menuLabel: { flex: 1, fontSize: 15, fontWeight: '600', color: COLORS.text },
+  menuRight: { fontSize: 14, fontWeight: '800', marginRight: 8, color: COLORS.primary },
+  
+  // Logout
+  logoutBtn: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    gap: 10, 
+    marginHorizontal: 16, 
+    marginTop: 24, 
+    paddingVertical: 15, 
+    backgroundColor: '#FFF5F5',
+    borderWidth: 1, 
+    borderColor: COLORS.primary + '20', 
+    borderRadius: 12 
+  },
+  logoutText: { fontSize: 15, fontWeight: '800', color: COLORS.primary },
 });
+

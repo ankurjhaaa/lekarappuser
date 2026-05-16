@@ -9,13 +9,7 @@ import { COLORS } from '../src/constants/theme';
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuthStore();
 
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-      </View>
-    );
-  }
+  if (isLoading) return null;
 
   if (isAuthenticated) {
     return <Redirect href="/(main)/(tabs)/home" />;

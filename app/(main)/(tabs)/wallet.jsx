@@ -9,7 +9,6 @@ export default function WalletScreen() {
   return (
     <SafeAreaView style={styles.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Title */}
         <View style={styles.titleRow}>
           <Text style={styles.pageTitle}>Wallet</Text>
         </View>
@@ -75,7 +74,7 @@ export default function WalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container: { flex: 1, backgroundColor: '#FDFDFD' },
   
   // Red Header
   redHeader: {
@@ -88,8 +87,13 @@ const styles = StyleSheet.create({
   lekarLogo: { fontSize: 28, fontWeight: '800', color: COLORS.white, fontStyle: 'italic' },
 
   // Title
-  titleRow: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 10 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: COLORS.text },
+  titleRow: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  pageTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
 
   // Balance Card
   balanceCard: {

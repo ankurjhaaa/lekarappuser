@@ -46,9 +46,14 @@ export default function NotificationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  titleRow: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 10 },
-  pageTitle: { fontSize: 24, fontWeight: '800', color: COLORS.text },
+  container: { flex: 1, backgroundColor: '#FDFDFD' },
+  titleRow: { paddingHorizontal: 20, paddingTop: 14, paddingBottom: 10 },
+  pageTitle: { 
+    fontSize: 22, 
+    fontWeight: '800', 
+    color: COLORS.text,
+    letterSpacing: -0.3,
+  },
   list: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 20 },
   notifCard: { flexDirection: 'row', backgroundColor: COLORS.white, borderRadius: SIZES.radiusXl, padding: 16, marginBottom: 10, ...SHADOWS.small },
   notifIcon: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center', marginRight: 14 },

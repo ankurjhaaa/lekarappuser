@@ -1,8 +1,8 @@
-import { Redirect, Tabs } from 'expo-router';
-import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import useAuthStore from '../../../src/store/authStore';
+import { Redirect, Tabs } from 'expo-router';
+import { StyleSheet } from 'react-native';
 import { COLORS } from '../../../src/constants/theme';
+import useAuthStore from '../../../src/store/authStore';
 
 /**
  * Main tab layout — authenticated screens.
@@ -22,7 +22,9 @@ export default function TabLayout() {
         tabBarInactiveTintColor: COLORS.textLight,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
-        animation: 'shift',
+        animation: 'none',
+        lazy: false,
+        sceneContainerStyle: { backgroundColor: COLORS.white },
       }}
     >
       <Tabs.Screen
