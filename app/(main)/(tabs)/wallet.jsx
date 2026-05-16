@@ -7,9 +7,7 @@ import LekarHeader from '../../../src/components/LekarHeader';
 
 export default function WalletScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onMenu={() => require('react-native').DeviceEventEmitter.emit('openSidebar')} />
-
+    <SafeAreaView style={styles.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Title */}
         <View style={styles.titleRow}>

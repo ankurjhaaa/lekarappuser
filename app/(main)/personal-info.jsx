@@ -10,8 +10,7 @@ export default function PersonalInfoScreen() {
   const { user } = useAuthStore();
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.titleRow}>
           <Text style={s.pageTitle}>Personal Information</Text>

@@ -797,15 +797,7 @@ export default function RideDetailScreen() {
   };
 
   return (
-    <SafeAreaView style={s.container} edges={['top', 'bottom']}>
-      {/* Compact Lekar Header with Sidebar Menu Button */}
-      <LekarHeader compact onMenu={() => setSidebarVisible(true)} />
-      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
-
-      {/* Floating Back Button */}
-      <TouchableOpacity style={s.floatingBack} onPress={() => router.back()}>
-        <Ionicons name="arrow-back" size={24} color={COLORS.primary} />
-      </TouchableOpacity>
+    <SafeAreaView style={s.container} edges={['bottom']}>
       {/* TOP HALF: MAP */}
       <View style={s.mapContainer}>
         <MapView

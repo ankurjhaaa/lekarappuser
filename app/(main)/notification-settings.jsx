@@ -14,8 +14,7 @@ export default function NotificationSettingsScreen() {
   const [email, setEmail] = useState(true);
 
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.titleRow}>
           <Text style={s.pageTitle}>Notifications</Text>

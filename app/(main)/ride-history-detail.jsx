@@ -37,8 +37,7 @@ export default function RideHistoryDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <LekarHeader onBack={() => router.back()} />
+      <SafeAreaView style={styles.container} edges={[]}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={COLORS.primary} />
         </View>
@@ -48,8 +47,7 @@ export default function RideHistoryDetailScreen() {
 
   if (!ride) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <LekarHeader onBack={() => router.back()} />
+      <SafeAreaView style={styles.container} edges={[]}>
         <View style={styles.titleRow}>
           <Text style={styles.pageTitle}>Ride Details</Text>
         </View>
@@ -68,8 +66,7 @@ export default function RideHistoryDetailScreen() {
   const createdDate = new Date(ride.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={styles.container} edges={[]}>
 
       {/* Title */}
       <View style={styles.titleRow}>

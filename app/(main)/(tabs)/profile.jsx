@@ -20,9 +20,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onMenu={() => require('react-native').DeviceEventEmitter.emit('openSidebar')} />
-
+    <SafeAreaView style={styles.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
         {/* Title + Edit */}
         <View style={styles.titleRow}>

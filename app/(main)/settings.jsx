@@ -7,8 +7,7 @@ import LekarHeader from '../../src/components/LekarHeader';
 
 export default function SettingsScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={styles.container} edges={[]}>
 
       {/* Title */}
       <View style={styles.titleRow}>

@@ -6,8 +6,7 @@ import LekarHeader from '../../src/components/LekarHeader';
 
 export default function PrivacyPolicyScreen() {
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={s.titleRow}>
           <Text style={s.pageTitle}>Privacy Policy</Text>

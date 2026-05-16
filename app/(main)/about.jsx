@@ -7,8 +7,7 @@ import LekarHeader from '../../src/components/LekarHeader';
 
 export default function AboutScreen() {
   return (
-    <SafeAreaView style={s.container} edges={['top']}>
-      <LekarHeader onBack={() => router.back()} />
+    <SafeAreaView style={s.container} edges={[]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, alignItems: 'center' }}>
         {/* Logo */}
         <View style={s.logoSection}>

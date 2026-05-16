@@ -79,10 +79,7 @@ export default function RidesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onMenu={() => setSidebarVisible(true)} />
-      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
-
+    <SafeAreaView style={styles.container} edges={[]}>
       {/* Title */}
       <View style={styles.titleRow}>
         <Text style={styles.pageTitle}>Bookings</Text>

@@ -35,7 +35,7 @@ export default function HomeScreen() {
   const [activeBooking, setActiveBooking] = useState(null);
   const [sidebarVisible, setSidebarVisible] = useState(false);
   const mapRef = useRef(null);
-  const slideAnim = useRef(new Animated.Value(100)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current; // Initialize to 0 for immediate visibility
 
   // Get current location
   useEffect(() => {
@@ -64,12 +64,18 @@ export default function HomeScreen() {
     })();
   }, []);
 
-  // Animate bottom card
+  // Animate map to current location once fetched
   useEffect(() => {
-    if (!loading) {
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, useNativeDriver: true }).start();
+    if (currentLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        ...currentLocation,
+        latitudeDelta: LATITUDE_DELTA,
+        longitudeDelta: LONGITUDE_DELTA,
+      }, 1000);
     }
-  }, [loading]);
+  }, [currentLocation]);
+
+  // No longer need a separate loading effect for the slide animation if initialized to 0
 
   // Refresh nearby drivers periodically — but NOT during active rides
   useEffect(() => {
@@ -94,59 +100,51 @@ export default function HomeScreen() {
     router.push('/(main)/search-location');
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loadingText}>Getting your location...</Text>
-      </View>
-    );
-  }
-
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <LekarHeader 
-        onMenu={() => setSidebarVisible(true)} 
-        rightIcon="notifications-outline" 
-        onRightPress={() => router.push('/(main)/(tabs)/notifications')} 
-      />
-      
-      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <View style={styles.mapWrapper}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          provider={PROVIDER_GOOGLE}
+          initialRegion={currentLocation ? {
+            ...currentLocation,
+            latitudeDelta: LATITUDE_DELTA,
+            longitudeDelta: LONGITUDE_DELTA,
+          } : {
+            latitude: 25.6117, longitude: 85.1441, // Patna fallback
+            latitudeDelta: LATITUDE_DELTA, longitudeDelta: LONGITUDE_DELTA,
+          }}
+          showsUserLocation
+          showsMyLocationButton={false}
+          showsCompass={false}
+          customMapStyle={mapStyle}
+        >
+          {/* Nearby Driver Markers — hide during active ride */}
+          {!activeBooking && nearbyDrivers.map((driver, index) => (
+            <Marker
+              key={`driver-${driver.user_id || index}`}
+              coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <View style={styles.driverMarker}>
+                <Ionicons
+                  name={driver.vehicle_type === 'cab' ? 'car' : driver.vehicle_type === 'auto' ? 'car-sport' : 'bicycle'}
+                  size={14} color={COLORS.white}
+                />
+              </View>
+            </Marker>
+          ))}
+        </MapView>
 
-      {/* Map */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        provider={PROVIDER_GOOGLE}
-        initialRegion={currentLocation ? {
-          ...currentLocation,
-          latitudeDelta: LATITUDE_DELTA,
-          longitudeDelta: LONGITUDE_DELTA,
-        } : {
-          latitude: 25.6117, longitude: 85.1441, // Patna fallback
-          latitudeDelta: LATITUDE_DELTA, longitudeDelta: LONGITUDE_DELTA,
-        }}
-        showsUserLocation
-        showsMyLocationButton={false}
-        showsCompass={false}
-        customMapStyle={mapStyle}
-      >
-        {/* Nearby Driver Markers — hide during active ride */}
-        {!activeBooking && nearbyDrivers.map((driver, index) => (
-          <Marker
-            key={`driver-${driver.user_id || index}`}
-            coordinate={{ latitude: driver.lat, longitude: driver.lng }}
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.driverMarker}>
-              <Ionicons
-                name={driver.vehicle_type === 'cab' ? 'car' : driver.vehicle_type === 'auto' ? 'car-sport' : 'bicycle'}
-                size={14} color={COLORS.white}
-              />
-            </View>
-          </Marker>
-        ))}
-      </MapView>
+        {/* Map Loading Overlay */}
+        {loading && (
+          <View style={styles.mapLoadingOverlay}>
+            <ActivityIndicator size="large" color={COLORS.primary} />
+            <Text style={styles.mapLoadingText}>Fetching your location...</Text>
+          </View>
+        )}
+      </View>
 
       {/* My Location Button */}
       <TouchableOpacity
@@ -223,7 +221,16 @@ const mapStyle = [
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  mapWrapper: { flex: 1, position: 'relative' },
   map: { flex: 1 },
+  mapLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#f5f5f5', // Solid background instead of transparent during load
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  mapLoadingText: { marginTop: 10, fontSize: SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   loadingText: { marginTop: 12, fontSize: SIZES.md, color: COLORS.textSecondary },
 
@@ -236,6 +243,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 44 : 10,
     paddingBottom: 14,
+    zIndex: 100, // Ensure header is always on top
   },
   menuBtn: {
     width: 40,
@@ -275,6 +283,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white, borderTopLeftRadius: SIZES.radiusXl, borderTopRightRadius: SIZES.radiusXl,
     paddingHorizontal: SIZES.padding, paddingTop: SIZES.paddingLg, paddingBottom: 30,
     ...SHADOWS.large,
+    zIndex: 100, // Ensure bottom card is always on top of map loading overlay
   },
 
   // Active ride

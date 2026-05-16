@@ -12,8 +12,7 @@ const DUMMY_NOTIFICATIONS = [
 
 export default function NotificationsScreen() {
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <LekarHeader onMenu={() => require('react-native').DeviceEventEmitter.emit('openSidebar')} />
+    <SafeAreaView style={styles.container} edges={[]}>
       <View style={styles.titleRow}>
         <Text style={styles.pageTitle}>Notifications</Text>
       </View>
