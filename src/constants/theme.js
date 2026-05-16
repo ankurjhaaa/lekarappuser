@@ -1,21 +1,26 @@
-// Theme constants — Red + White premium UI
+// Theme constants — Lekar Red + White premium UI (matching Figma design)
 export const COLORS = {
-  primary: '#E63946',        // Lekar Red
-  primaryDark: '#C1121F',
-  primaryLight: '#FFB3B8',
-  secondary: '#1D3557',      // Deep navy
-  accent: '#F77F00',         // Orange accent
+  primary: '#D32F2F',        // Lekar Deep Red
+  primaryDark: '#B71C1C',
+  primaryLight: '#FFCDD2',
+  secondary: '#1D3557',
+  accent: '#F7C937',
+  accentYellow: '#F7C937',
   
   white: '#FFFFFF',
   black: '#000000',
   background: '#F8F9FA',
   surface: '#FFFFFF',
+  darkGray: '#4FC1E1',
+  gray: '#4F6F8A',
   
   text: '#1A1A2E',
   textSecondary: '#6C757D',
   textLight: '#ADB5BD',
+  textMuted: '#CED4DA',
   
-  success: '#06D6A0',
+  success: '#06B847',
+  successGreen: '#06B847',
   warning: '#FFD166',
   error: '#EF476F',
   info: '#118AB2',
@@ -27,7 +32,11 @@ export const COLORS = {
   card: '#FFFFFF',
   inputBg: '#F1F3F5',
   
-  mapOverlay: 'rgba(230, 57, 70, 0.1)',
+  mapOverlay: 'rgba(211, 47, 47, 0.1)',
+  
+  // Lekar brand specific
+  headerRed: '#D32F2F',
+  lightGray: '#F0F0FA',
 };
 
 export const FONTS = {
@@ -53,11 +62,11 @@ export const SIZES = {
   paddingLg: 24,
   paddingXl: 32,
   
-  // Border radius
+  // Border radius (rounded corners 18px from style guide)
   radiusSm: 8,
   radius: 12,
   radiusLg: 16,
-  radiusXl: 24,
+  radiusXl: 18,   // Lekar standard
   radiusFull: 999,
 };
 
@@ -65,21 +74,21 @@ export const SHADOWS = {
   small: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
   },
   medium: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
   },
   large: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
+    shadowOpacity: 0.14,
     shadowRadius: 16,
     elevation: 8,
   },

@@ -6,7 +6,7 @@ import { COLORS } from '../../../src/constants/theme';
 
 /**
  * Main tab layout — authenticated screens.
- * Home, Rides, Wallet, Profile tabs.
+ * 5 tabs: Home, Bookings, Wallet, Notifications, Profile (matching Figma)
  */
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuthStore();
@@ -22,6 +22,7 @@ export default function TabLayout() {
         tabBarInactiveTintColor: COLORS.textLight,
         tabBarStyle: styles.tabBar,
         tabBarLabelStyle: styles.tabLabel,
+        animation: 'shift',
       }}
     >
       <Tabs.Screen
@@ -29,16 +30,16 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="location" size={size} color={color} />
+            <Ionicons name="home-outline" size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
         name="rides"
         options={{
-          title: 'Rides',
+          title: 'Bookings',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="car" size={size} color={color} />
+            <Ionicons name="calendar-outline" size={22} color={color} />
           ),
         }}
       />
@@ -47,7 +48,16 @@ export default function TabLayout() {
         options={{
           title: 'Wallet',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="wallet" size={size} color={color} />
+            <Ionicons name="wallet-outline" size={22} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="notifications-outline" size={22} color={color} />
           ),
         }}
       />
@@ -56,7 +66,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person" size={22} color={color} />
           ),
         }}
       />
@@ -67,14 +77,19 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
+    borderTopWidth: 0.5,
     borderTopColor: COLORS.border,
-    height: 60,
-    paddingBottom: 8,
-    paddingTop: 4,
+    height: 64,
+    paddingBottom: 10,
+    paddingTop: 6,
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
   },
   tabLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
 });

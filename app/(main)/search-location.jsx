@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Keyboard,
   DeviceEventEmitter,
+  StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,13 +97,16 @@ export default function SearchLocationScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.text} />
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+      
+      {/* Red Header */}
+      <View style={styles.redHeader}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.headerBackBtn}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.white} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Set destination</Text>
+        <Text style={styles.lekarLogo}>Lekar</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Location Inputs */}
@@ -173,15 +177,28 @@ export default function SearchLocationScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
-  header: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIZES.padding,
-    paddingTop: 12, paddingBottom: 12, gap: 12,
+  
+  // Red Header
+  redHeader: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 14,
   },
-  backBtn: { padding: 4 },
-  headerTitle: { fontSize: SIZES.lg, fontWeight: '700', color: COLORS.text },
+  headerBackBtn: {
+    width: 40, height: 40, justifyContent: 'center', alignItems: 'center',
+  },
+  lekarLogo: {
+    fontSize: 26, fontWeight: '800', color: COLORS.white, fontStyle: 'italic',
+  },
 
+  // Inputs
   inputsCard: {
-    marginHorizontal: SIZES.padding, backgroundColor: COLORS.inputBg,
+    marginHorizontal: SIZES.padding, marginTop: 16,
+    backgroundColor: COLORS.inputBg,
     borderRadius: SIZES.radius, borderWidth: 1, borderColor: COLORS.border,
     overflow: 'hidden',
   },
@@ -198,10 +215,10 @@ const styles = StyleSheet.create({
   predictionsList: { paddingTop: 8 },
   predictionItem: {
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: SIZES.padding,
-    paddingVertical: 14, gap: 14,
+    paddingVertical: 14, gap: 14, borderBottomWidth: 1, borderBottomColor: COLORS.border + '40',
   },
   predictionIcon: {
-    width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primaryLight + '30',
+    width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary + '12',
     justifyContent: 'center', alignItems: 'center',
   },
   predictionText: { flex: 1 },

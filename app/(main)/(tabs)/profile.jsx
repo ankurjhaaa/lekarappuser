@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { COLORS, SIZES, SHADOWS } from '../../../src/constants/theme';
 import useAuthStore from '../../../src/store/authStore';
+import LekarHeader from '../../../src/components/LekarHeader';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -18,96 +19,107 @@ export default function ProfileScreen() {
     ]);
   };
 
-  const menuItems = [
-    { icon: 'person-outline', label: 'Edit Profile', color: '#1877F2' },
-    { icon: 'location-outline', label: 'Saved Places', color: COLORS.success },
-    { icon: 'shield-outline', label: 'Safety', color: COLORS.accent },
-    { icon: 'notifications-outline', label: 'Notifications', color: '#9C27B0' },
-    { icon: 'help-circle-outline', label: 'Help & Support', color: '#00BCD4' },
-    { icon: 'document-text-outline', label: 'Terms & Conditions', color: COLORS.textSecondary },
-    { icon: 'information-circle-outline', label: 'About', color: COLORS.textSecondary },
-  ];
-
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Profile</Text>
-        </View>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <LekarHeader onMenu={() => require('react-native').DeviceEventEmitter.emit('openSidebar')} />
 
-        {/* Profile Card */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{user?.name?.[0]?.toUpperCase() || 'U'}</Text>
-          </View>
-          <View style={styles.profileInfo}>
-            <Text style={styles.userName}>{user?.name || 'User'}</Text>
-            <Text style={styles.userPhone}>{user?.phone ? `+91 ${user.phone}` : ''}</Text>
-            {user?.email && <Text style={styles.userEmail}>{user.email}</Text>}
-          </View>
-          <TouchableOpacity style={styles.editBtn}>
-            <Ionicons name="create-outline" size={20} color={COLORS.primary} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        {/* Title + Edit */}
+        <View style={styles.titleRow}>
+          <Text style={styles.pageTitle}>Profile</Text>
+          <TouchableOpacity style={styles.editBtn} onPress={() => router.push('/(main)/personal-info')}>
+            <Ionicons name="create-outline" size={18} color={COLORS.primary} />
+            <Text style={styles.editBtnText}>Edit Profile</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Menu */}
-        <View style={styles.menu}>
-          {menuItems.map((item, i) => (
-            <TouchableOpacity key={i} style={styles.menuItem} activeOpacity={0.7}>
-              <View style={[styles.menuIcon, { backgroundColor: item.color + '15' }]}>
-                <Ionicons name={item.icon} size={20} color={item.color} />
+        {/* Profile Card */}
+        <TouchableOpacity style={styles.profileCard} activeOpacity={0.7} onPress={() => router.push('/(main)/personal-info')}>
+          <View style={styles.avatarCircle}>
+            <Ionicons name="person" size={44} color={COLORS.textLight} />
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.userName}>{user?.name || 'User'}</Text>
+            <View style={styles.ratingRow}>
+              <View style={styles.ratingBadge}>
+                <Ionicons name="star" size={12} color="#F59E0B" />
+                <Text style={styles.ratingText}>4.8</Text>
               </View>
-              <Text style={styles.menuLabel}>{item.label}</Text>
-              <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
-            </TouchableOpacity>
-          ))}
+              <Text style={styles.tripsText}>0 Trips</Text>
+            </View>
+            {user?.phone && (
+              <View style={styles.contactRow}>
+                <Ionicons name="call" size={14} color={COLORS.primary} />
+                <Text style={styles.contactText}>+91 {user.phone}</Text>
+              </View>
+            )}
+            {user?.email && (
+              <View style={styles.contactRow}>
+                <Ionicons name="mail" size={14} color={COLORS.primary} />
+                <Text style={styles.contactText}>{user.email}</Text>
+              </View>
+            )}
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+        </TouchableOpacity>
+
+        {/* Menu Group 1 */}
+        <View style={styles.menuCard}>
+          <MenuItem icon="person-outline" label="Personal Information" color={COLORS.primary} onPress={() => router.push('/(main)/personal-info')} />
+          <MenuItem icon="car-outline" label="My Vehicles" color={COLORS.primary} onPress={() => router.push('/(main)/my-vehicles')} />
+          <MenuItem icon="wallet-outline" label="Wallet" color={COLORS.primary} rightText="₹0.00" rightColor={COLORS.primary} last />
+        </View>
+
+        {/* Menu Group 2 */}
+        <View style={styles.menuCard}>
+          <MenuItem icon="headset-outline" label="Help & Support" color={COLORS.primary} onPress={() => router.push('/(main)/help-support')} />
+          <MenuItem icon="shield-outline" label="Safety" color={COLORS.primary} onPress={() => router.push('/(main)/safety')} />
+          <MenuItem icon="settings-outline" label="Settings" color={COLORS.primary} onPress={() => router.push('/(main)/settings')} last />
         </View>
 
         {/* Logout */}
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+          <Ionicons name="log-out-outline" size={20} color={COLORS.primary} />
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
-
-        <Text style={styles.version}>Lekar v1.0.0</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function MenuItem({ icon, label, color, rightText, rightColor, last, onPress }) {
+  return (
+    <TouchableOpacity style={[styles.menuItem, !last && styles.menuItemBorder]} activeOpacity={0.6} onPress={onPress}>
+      <Ionicons name={icon} size={22} color={color} style={styles.menuIcon} />
+      <Text style={styles.menuLabel}>{label}</Text>
+      {rightText && <Text style={[styles.menuRight, rightColor && { color: rightColor }]}>{rightText}</Text>}
+      <Ionicons name="chevron-forward" size={18} color={COLORS.textLight} />
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
-  header: { paddingHorizontal: SIZES.padding, paddingTop: 16, paddingBottom: 12 },
-  title: { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.text },
-  profileCard: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white,
-    marginHorizontal: SIZES.padding, borderRadius: SIZES.radiusLg, padding: 20, ...SHADOWS.small,
-  },
-  avatar: {
-    width: 56, height: 56, borderRadius: 28, backgroundColor: COLORS.primary,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  avatarText: { fontSize: SIZES.xxl, fontWeight: '800', color: COLORS.white },
-  profileInfo: { flex: 1, marginLeft: 16 },
-  userName: { fontSize: SIZES.lg, fontWeight: '700', color: COLORS.text },
-  userPhone: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  userEmail: { fontSize: SIZES.xs, color: COLORS.textLight, marginTop: 2 },
-  editBtn: { padding: 8 },
-  menu: {
-    backgroundColor: COLORS.white, marginHorizontal: SIZES.padding, marginTop: 20,
-    borderRadius: SIZES.radiusLg, ...SHADOWS.small,
-  },
-  menuItem: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
-    paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.border,
-  },
-  menuIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center', marginRight: 14 },
-  menuLabel: { flex: 1, fontSize: SIZES.md, fontWeight: '500', color: COLORS.text },
-  logoutBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginHorizontal: SIZES.padding, marginTop: 24, paddingVertical: 16,
-    backgroundColor: COLORS.error + '10', borderRadius: SIZES.radius,
-  },
-  logoutText: { fontSize: SIZES.md, fontWeight: '700', color: COLORS.error },
-  version: { textAlign: 'center', fontSize: SIZES.xs, color: COLORS.textLight, marginTop: 20, marginBottom: 40 },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12 },
+  pageTitle: { fontSize: 26, fontWeight: '800', color: COLORS.text },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  editBtnText: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.primary },
+  profileCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, marginHorizontal: 16, borderRadius: SIZES.radiusXl, padding: 16, ...SHADOWS.small },
+  avatarCircle: { width: 72, height: 72, borderRadius: 36, backgroundColor: '#F0F0F0', justifyContent: 'center', alignItems: 'center' },
+  profileInfo: { flex: 1, marginLeft: 14 },
+  userName: { fontSize: 20, fontWeight: '800', color: COLORS.text },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
+  ratingBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FEF9C3', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  ratingText: { fontSize: SIZES.sm, fontWeight: '700', color: '#92400E' },
+  tripsText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
+  contactRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  contactText: { fontSize: SIZES.sm, color: COLORS.textSecondary },
+  menuCard: { backgroundColor: COLORS.white, marginHorizontal: 16, marginTop: 16, borderRadius: SIZES.radiusXl, ...SHADOWS.small },
+  menuItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingVertical: 17 },
+  menuItemBorder: { borderBottomWidth: 1, borderBottomColor: COLORS.border },
+  menuIcon: { width: 30, marginRight: 14 },
+  menuLabel: { flex: 1, fontSize: SIZES.base, fontWeight: '600', color: COLORS.text },
+  menuRight: { fontSize: SIZES.md, fontWeight: '700', marginRight: 8 },
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start', gap: 10, marginHorizontal: 16, marginTop: 20, paddingVertical: 16, paddingHorizontal: 18, borderWidth: 1.5, borderColor: COLORS.primary + '30', borderRadius: SIZES.radiusXl },
+  logoutText: { fontSize: SIZES.base, fontWeight: '700', color: COLORS.primary },
 });

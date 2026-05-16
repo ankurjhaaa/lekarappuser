@@ -9,6 +9,7 @@ import {
   Animated,
   Platform,
   ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE } from '../../../src/components/MapViewSafe';
 import * as Location from 'expo-location';
@@ -18,6 +19,8 @@ import { COLORS, SIZES, SHADOWS } from '../../../src/constants/theme';
 import { ridesAPI } from '../../../src/api/rides';
 import useRideStore from '../../../src/store/rideStore';
 import useAuthStore from '../../../src/store/authStore';
+import LekarHeader from '../../../src/components/LekarHeader';
+import SidebarMenu from '../../../src/components/SidebarMenu';
 
 const { width, height } = Dimensions.get('window');
 const ASPECT_RATIO = width / height;
@@ -30,6 +33,7 @@ export default function HomeScreen() {
   const [currentLocation, setCurrentLocation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeBooking, setActiveBooking] = useState(null);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
   const mapRef = useRef(null);
   const slideAnim = useRef(new Animated.Value(100)).current;
 
@@ -101,6 +105,14 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <LekarHeader 
+        onMenu={() => setSidebarVisible(true)} 
+        rightIcon="notifications-outline" 
+        onRightPress={() => router.push('/(main)/(tabs)/notifications')} 
+      />
+      
+      <SidebarMenu visible={sidebarVisible} onClose={() => setSidebarVisible(false)} />
+
       {/* Map */}
       <MapView
         ref={mapRef}
@@ -129,25 +141,12 @@ export default function HomeScreen() {
             <View style={styles.driverMarker}>
               <Ionicons
                 name={driver.vehicle_type === 'cab' ? 'car' : driver.vehicle_type === 'auto' ? 'car-sport' : 'bicycle'}
-                size={16} color={COLORS.white}
+                size={14} color={COLORS.white}
               />
             </View>
           </Marker>
         ))}
       </MapView>
-
-      {/* Top Header */}
-      <SafeAreaView style={styles.topBar}>
-        <View style={styles.headerRow}>
-          <View style={styles.greeting}>
-            <Text style={styles.greetingHi}>Hello, {user?.name?.split(' ')[0] || 'there'} 👋</Text>
-            <Text style={styles.greetingSubtext}>Where are you going?</Text>
-          </View>
-          <TouchableOpacity style={styles.notifBtn}>
-            <Ionicons name="notifications-outline" size={22} color={COLORS.text} />
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
 
       {/* My Location Button */}
       <TouchableOpacity
@@ -192,8 +191,8 @@ export default function HomeScreen() {
         {/* Quick Actions */}
         <View style={styles.quickActions}>
           <TouchableOpacity style={styles.quickBtn}>
-            <View style={[styles.quickIcon, { backgroundColor: '#EBF5FF' }]}>
-              <Ionicons name="home" size={18} color="#1877F2" />
+            <View style={[styles.quickIcon, { backgroundColor: COLORS.primary + '12' }]}>
+              <Ionicons name="home" size={18} color={COLORS.primary} />
             </View>
             <Text style={styles.quickLabel}>Home</Text>
           </TouchableOpacity>
@@ -223,23 +222,38 @@ const mapStyle = [
 ];
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: COLORS.background },
   map: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.background },
   loadingText: { marginTop: 12, fontSize: SIZES.md, color: COLORS.textSecondary },
 
-  // Top bar
-  topBar: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: 'transparent' },
-  headerRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: SIZES.padding, paddingTop: Platform.OS === 'android' ? 44 : 8, paddingBottom: 8,
+  // Lekar Header
+  lekarHeader: {
+    backgroundColor: COLORS.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 44 : 10,
+    paddingBottom: 14,
   },
-  greeting: {},
-  greetingHi: { fontSize: SIZES.lg, fontWeight: '700', color: COLORS.text },
-  greetingSubtext: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+  menuBtn: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lekarLogo: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: COLORS.white,
+    fontStyle: 'italic',
+  },
   notifBtn: {
-    width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.white,
-    justifyContent: 'center', alignItems: 'center', ...SHADOWS.small,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   // My location button
@@ -251,7 +265,7 @@ const styles = StyleSheet.create({
 
   // Driver markers
   driverMarker: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.secondary,
+    width: 30, height: 30, borderRadius: 15, backgroundColor: COLORS.text,
     justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.white,
   },
 
