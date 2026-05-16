@@ -13,7 +13,7 @@ export default function CustomModal({ visible, onClose, children, hideCloseIcon 
       setShow(true);
       Animated.parallel([
         Animated.timing(bgAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
-        Animated.spring(slideAnim, { toValue: 0, friction: 9, tension: 60, useNativeDriver: true })
+        Animated.timing(slideAnim, { toValue: 0, duration: 300, useNativeDriver: true })
       ]).start();
     } else {
       Animated.parallel([

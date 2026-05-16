@@ -14,6 +14,7 @@ import {
   Image,
   Linking,
   Platform,
+  DeviceEventEmitter,
 } from 'react-native';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../src/components/MapViewSafe';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -26,6 +27,7 @@ import { decodePolyline, formatCurrency, formatDuration, formatDistance } from '
 import { subscribeToBooking, unsubscribeFromBooking, initWebSocket } from '../../src/services/socket';
 import CancelModal from '../../src/components/ride/CancelModal';
 import DriverDetailModal from '../../src/components/ride/DriverDetailModal';
+import TripDetailModal from '../../src/components/ride/TripDetailModal';
 import ChatModal from '../../src/components/ride/ChatModal';
 import CustomModal from '../../src/components/CustomModal';
 import * as Location from 'expo-location';
@@ -56,13 +58,11 @@ export default function RideDetailScreen() {
   const [liveDistanceKm, setLiveDistanceKm] = useState(null); // live distance during ride
   const [liveETA, setLiveETA] = useState(null); // live ETA during ride
   const [rating, setRating] = useState(0);
-  const [showDestChange, setShowDestChange] = useState(false);
-  const [destQuery, setDestQuery] = useState('');
-  const [destSuggestions, setDestSuggestions] = useState([]);
   const [destLoading, setDestLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showCancel, setShowCancel] = useState(false);
   const [showDriverDetail, setShowDriverDetail] = useState(false);
+  const [showTripDetail, setShowTripDetail] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [routeFetchedForStatus, setRouteFetchedForStatus] = useState('');
   const mapRef = useRef(null);
@@ -92,6 +92,14 @@ export default function RideDetailScreen() {
       if (params.bookingId) unsubscribeFromBooking(params.bookingId);
     };
   }, []);
+
+  // Listen for destination changes from search-location screen
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('change_destination_selected', (place) => {
+      handleDestinationChange(place);
+    });
+    return () => sub.remove();
+  }, [currentBooking, driverLoc]);
 
   // Update route geometry based on ride status
   useEffect(() => {
@@ -144,8 +152,9 @@ export default function RideDetailScreen() {
   const fitMapToCoords = (coords) => {
     setTimeout(() => {
       if (mapRef.current && coords.length > 0) {
+        // Use small bottom padding since map is only 50% of screen
         mapRef.current.fitToCoordinates(coords, {
-          edgePadding: { top: 100, right: 60, bottom: 300, left: 60 },
+          edgePadding: { top: 80, right: 50, bottom: 50, left: 50 },
           animated: true,
         });
       }
@@ -161,15 +170,7 @@ export default function RideDetailScreen() {
         if (res.data.geometry) {
           const coords = decodePolyline(res.data.geometry);
           setRouteCoords(coords);
-          // Fit map to route
-          setTimeout(() => {
-            if (mapRef.current && coords.length > 0) {
-              mapRef.current.fitToCoordinates(coords, {
-                edgePadding: { top: 100, right: 60, bottom: 300, left: 60 },
-                animated: true,
-              });
-            }
-          }, 500);
+          fitMapToCoords(coords);
         }
       }
     } catch (e) { console.error('Directions error:', e); }
@@ -212,8 +213,13 @@ export default function RideDetailScreen() {
 
   const startPolling = (bookingId) => {
     if (pollRef.current) clearInterval(pollRef.current);
-    // Polling is ONLY a safety net for missed WebSocket events
-    pollRef.current = setInterval(async () => {
+    // Fast polling during search (10s), slower during active ride (30s)
+    const getInterval = () => {
+      const st = bookingStatus || 'searching_driver';
+      if (['searching_driver', 'driver_assigned'].includes(st)) return 10000;
+      return 30000;
+    };
+    const poll = async () => {
       try {
         const res = await ridesAPI.getStatus(bookingId);
         if (res.data.success) {
@@ -226,7 +232,8 @@ export default function RideDetailScreen() {
           }
         }
       } catch (e) { /* silent */ }
-    }, 60000); // 60s extreme fallback — WebSocket handles everything
+    };
+    pollRef.current = setInterval(poll, getInterval());
   };
 
   const startWebSocket = async (bookingId) => {
@@ -284,8 +291,8 @@ export default function RideDetailScreen() {
         setCurrentBooking(bk);
         setBookingStatus(bk.status);
         setActiveBooking(bk);
-        startPolling(bk.id);
-        startWebSocket(bk.id);
+        // Use loadBooking which sets up polling + websocket + fetches latest state
+        loadBooking(bk.id);
       } else {
         Alert.alert('Error', res.data.message || 'Booking failed.');
       }
@@ -351,15 +358,6 @@ export default function RideDetailScreen() {
     return 'car';
   };
 
-  // Destination change search
-  const searchDestination = async (text) => {
-    setDestQuery(text);
-    if (text.length < 3) { setDestSuggestions([]); return; }
-    try {
-      const res = await placesAPI.autocomplete(text, pickup?.lat, pickup?.lng);
-      if (res.data.success) setDestSuggestions(res.data.predictions || []);
-    } catch (e) { /* silent */ }
-  };
 
   const handleDestinationChange = async (place) => {
     setDestLoading(true);
@@ -395,9 +393,6 @@ export default function RideDetailScreen() {
           lng: newLng,
         });
 
-        setShowDestChange(false);
-        setDestQuery('');
-        setDestSuggestions([]);
         setRouteFetchedForStatus('');
         if (dirRes.data.geometry) {
           const coords = decodePolyline(dirRes.data.geometry);
@@ -445,7 +440,7 @@ export default function RideDetailScreen() {
               <Text style={s.fareCardLabel}>Total Fare</Text>
               <Text style={s.fareCardValue}>{formatCurrency(currentBooking?.fare_total || fare)}</Text>
             </View>
-            <TouchableOpacity style={s.tripDetailsBtn} onPress={() => setShowDriverDetail(true)}>
+            <TouchableOpacity style={s.tripDetailsBtn} onPress={() => setShowTripDetail(true)}>
               <Text style={s.tripDetailsBtnText}>Trip Details</Text>
             </TouchableOpacity>
           </View>
@@ -463,11 +458,24 @@ export default function RideDetailScreen() {
       const isArrived = bookingStatus === 'arrived_at_pickup';
       return (
         <>
-          <View style={[s.statusChip, { backgroundColor: isArrived ? '#06D6A015' : COLORS.primary + '10' }]}>
-            <Ionicons name={isArrived ? 'checkmark-circle' : 'navigate'} size={16} color={isArrived ? COLORS.success : COLORS.primary} />
-            <Text style={[s.statusChipText, { color: isArrived ? COLORS.success : COLORS.primary }]}>
-              {isArrived ? 'Captain arrived at pickup' : `Arriving in ${driverETA || '...'} min`}
-            </Text>
+          <View style={[s.statusChip, { backgroundColor: '#fff', borderWidth: 1, borderColor: isArrived ? COLORS.success : COLORS.border }]}>
+            {isArrived ? (
+              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                <Ionicons name="checkmark-circle" size={24} color={COLORS.success} />
+                <Text style={[s.statusChipText, { color: COLORS.success, fontSize: SIZES.lg, fontWeight: '700' }]}>Captain arrived at pickup</Text>
+              </View>
+            ) : (
+              <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+                 <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={{ fontSize: SIZES.lg, fontWeight: '700', color: COLORS.text, lineHeight: 24 }}>
+                      Captain is {driverDistanceKm ? (driverDistanceKm < 1 ? Math.round(driverDistanceKm * 1000) + ' m' : driverDistanceKm.toFixed(1) + ' km') : '...'} away and will take {driverETA || '...'} minutes to arrive.
+                    </Text>
+                 </View>
+                 <View style={{backgroundColor: COLORS.primary + '15', padding: 10, borderRadius: 12}}>
+                    <Ionicons name="time" size={24} color={COLORS.primary} />
+                 </View>
+              </View>
+            )}
           </View>
           {currentBooking?.otp_code && (
             <View style={s.otpBigCard}>
@@ -512,14 +520,22 @@ export default function RideDetailScreen() {
     // RIDE STARTED
     if (bookingStatus === 'ride_started' || bookingStatus === 'otp_verified') {
       const etaMin = liveETA || currentBooking?.duration_min || '--';
+      const distKm = liveDistanceKm || currentBooking?.distance_km;
+      const distDisplay = distKm ? (distKm < 1 ? Math.round(distKm * 1000) + ' m' : parseFloat(distKm).toFixed(1) + ' km') : '--';
       return (
         <>
           {/* Rapido-style ETA header */}
-          <View style={s.rideHeaderSection}>
-            <Text style={s.rideHeaderTitle}>
-              Reaching drop location in <Text style={{ color: COLORS.success }}>{etaMin} min</Text>
-            </Text>
-            <Text style={s.rideHeaderSub}>Reaching {currentBooking?.drop_location?.split(',')[0] || ''}</Text>
+          <View style={[s.statusChip, { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.border }]}>
+             <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%'}}>
+                <View style={{ flex: 1, paddingRight: 10 }}>
+                   <Text style={{ fontSize: SIZES.lg, fontWeight: '700', color: COLORS.text, lineHeight: 24 }}>
+                      Destination is {distDisplay} away and will take {etaMin} minutes to reach.
+                   </Text>
+                </View>
+                <View style={{backgroundColor: COLORS.success + '15', padding: 10, borderRadius: 12}}>
+                   <Ionicons name="flag" size={24} color={COLORS.success} />
+                </View>
+             </View>
           </View>
 
           {/* Drop address + Trip Details */}
@@ -528,7 +544,7 @@ export default function RideDetailScreen() {
               <Text style={s.dropLabel}>Drop to</Text>
               <Text style={s.dropAddr} numberOfLines={1}>{currentBooking?.drop_location || drop?.address}</Text>
             </View>
-            <TouchableOpacity style={s.tripDetailsBtn} onPress={() => setShowDriverDetail(true)}>
+            <TouchableOpacity style={s.tripDetailsBtn} onPress={() => setShowTripDetail(true)}>
               <Text style={s.tripDetailsBtnText}>Trip Details</Text>
             </TouchableOpacity>
           </View>
@@ -552,7 +568,7 @@ export default function RideDetailScreen() {
               <Ionicons name="chatbubble-outline" size={18} color={COLORS.primary} />
               <Text style={s.actionBtnText}>Chat</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.actionBtn} onPress={() => setShowDestChange(true)}>
+            <TouchableOpacity style={s.actionBtn} onPress={() => router.push({ pathname: '/(main)/search-location', params: { mode: 'change_dest' } })}>
               <Ionicons name="location-outline" size={18} color={COLORS.primary} />
               <Text style={s.actionBtnText}>Change Drop</Text>
             </TouchableOpacity>
@@ -625,19 +641,22 @@ export default function RideDetailScreen() {
 
     return null;
   };
-  // ── Ad Banners ──
+  // ── Ad Banners (square image slots with clickable links) ──
+  const AD_SLOTS = [
+    { link: 'https://lekar.in/offers', placeholder: 'Ad Image 1' },
+    { link: 'https://lekar.in/refer', placeholder: 'Ad Image 2' },
+    { link: 'https://lekar.in/safety', placeholder: 'Ad Image 3' },
+  ];
   const renderAds = () => (
-    <View style={{ marginTop: 14 }}>
-      {[
-        { bg: '#E63946', title: '🎉 50% OFF next ride!', sub: 'Use code LEKAR50' },
-        { bg: '#1D3557', title: '👥 Refer & Earn ₹100', sub: 'Invite friends to Lekar' },
-        { bg: '#2D6A4F', title: '🛡️ Safety matters', sub: 'Share ride with family' },
-      ].map((ad, i) => (
-        <View key={i} style={[s.adBanner, { backgroundColor: ad.bg }]}>
-          <View style={s.adImageSlot}><Ionicons name="image-outline" size={32} color="#ffffff50" /></View>
-          <Text style={s.adTitle}>{ad.title}</Text>
-          <Text style={s.adSub}>{ad.sub}</Text>
-        </View>
+    <View style={{ marginTop: 14, gap: 10 }}>
+      {AD_SLOTS.map((ad, i) => (
+        <TouchableOpacity key={i} style={s.adSquare} onPress={() => Linking.openURL(ad.link)} activeOpacity={0.8}>
+          {/* Replace this View with <Image source={...} style={s.adImage} /> when you have real ad images */}
+          <View style={s.adImagePlaceholder}>
+            <Ionicons name="image-outline" size={40} color={COLORS.textLight} />
+            <Text style={s.adPlaceholderText}>{ad.placeholder}</Text>
+          </View>
+        </TouchableOpacity>
       ))}
     </View>
   );
@@ -698,12 +717,18 @@ export default function RideDetailScreen() {
               ]).map((est, i) => {
                 const name = est.vehicle?.name || 'Bike';
                 const isSelected = name.toLowerCase() === selectedVehicle.toLowerCase();
+                const distKm = distance || 0;
+                const calcMin = Math.round(distKm * 1.5) || 1;
+                const arrivalDate = new Date();
+                arrivalDate.setMinutes(arrivalDate.getMinutes() + calcMin);
+                const arrivalStr = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                 return (
                   <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
                     <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={26} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
                     <View style={{ flex: 1, marginLeft: 12 }}>
                       <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
-                      <Text style={s.vSub}>{est.eta_min ? `${est.eta_min} min` : 'Quick rides'} • {formatDuration(duration)}</Text>
+                      <Text style={s.vSub}>{calcMin}m • Arrives at {arrivalStr}</Text>
                     </View>
                     <Text style={[s.vFare, isSelected && { color: COLORS.primary }]}>{est.fare ? formatCurrency(est.fare) : '--'}</Text>
                   </TouchableOpacity>
@@ -725,29 +750,6 @@ export default function RideDetailScreen() {
           </>
         )}
       </View>
-
-      {/* Destination Change Modal */}
-      <CustomModal visible={showDestChange} onClose={() => { setShowDestChange(false); setDestQuery(''); setDestSuggestions([]); }}>
-        <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
-          <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Change Destination</Text>
-          </View>
-          <TextInput style={s.modalInput} placeholder="Search new destination..." placeholderTextColor={COLORS.textLight} value={destQuery} onChangeText={searchDestination} autoFocus />
-          {destLoading && <ActivityIndicator style={{ marginTop: 14 }} color={COLORS.primary} />}
-          <ScrollView style={s.modalSuggestions}>
-            {destSuggestions.map((sg, i) => (
-              <TouchableOpacity key={i} style={s.modalSuggItem} onPress={() => handleDestinationChange(sg)}>
-                <Ionicons name="location-outline" size={18} color={COLORS.primary} />
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={s.modalSuggMain} numberOfLines={1}>{sg.structured_formatting?.main_text || sg.description}</Text>
-                  <Text style={s.modalSuggSub} numberOfLines={1}>{sg.structured_formatting?.secondary_text || ''}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </TouchableOpacity>
-      </CustomModal>
 
       {/* Destination History Modal */}
       <CustomModal visible={showHistory} onClose={() => setShowHistory(false)}>
@@ -776,8 +778,11 @@ export default function RideDetailScreen() {
       {/* Cancel Reason Modal */}
       <CancelModal visible={showCancel} onClose={() => setShowCancel(false)} onConfirm={confirmCancel} />
 
-      {/* Driver/Trip Detail Modal */}
+      {/* Driver Profile Modal */}
       <DriverDetailModal visible={showDriverDetail} onClose={() => setShowDriverDetail(false)} booking={currentBooking} driverInfo={driverInfo} />
+
+      {/* Trip Detail Modal */}
+      <TripDetailModal visible={showTripDetail} onClose={() => setShowTripDetail(false)} booking={currentBooking} liveDistanceKm={liveDistanceKm} liveETA={liveETA} />
 
       {/* Chat Modal */}
       <ChatModal
@@ -879,11 +884,11 @@ const s = StyleSheet.create({
   primaryBtn: { backgroundColor: COLORS.primary, paddingVertical: 15, borderRadius: 12, alignItems: 'center', marginBottom: 10 },
   primaryBtnText: { color: '#fff', fontSize: SIZES.lg, fontWeight: '700' },
 
-  // Ad banners
-  adBanner: { borderRadius: 12, padding: 16, marginBottom: 10, minHeight: 120, justifyContent: 'flex-end' },
-  adImageSlot: { position: 'absolute', top: 12, right: 16, width: 80, height: 60, borderRadius: 8, backgroundColor: '#ffffff15', justifyContent: 'center', alignItems: 'center' },
-  adTitle: { color: '#fff', fontSize: SIZES.md, fontWeight: '700' },
-  adSub: { color: '#ffffffCC', fontSize: SIZES.sm, marginTop: 3 },
+  // Ad banners (square image slots)
+  adSquare: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden', backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: COLORS.border },
+  adImagePlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  adPlaceholderText: { fontSize: SIZES.sm, color: COLORS.textLight, marginTop: 6 },
+  adImage: { width: '100%', height: '100%', borderRadius: 12 },
 
   // Modals — clean white sheet from bottom
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },

@@ -9,8 +9,9 @@ import {
   StyleSheet,
   ActivityIndicator,
   Keyboard,
+  DeviceEventEmitter,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SIZES, SHADOWS } from '../../src/constants/theme';
 import { placesAPI } from '../../src/api/places';
@@ -18,6 +19,7 @@ import useRideStore from '../../src/store/rideStore';
 
 export default function SearchLocationScreen() {
   const { pickup, drop, setPickup, setDrop } = useRideStore();
+  const params = useLocalSearchParams();
   const [query, setQuery] = useState('');
   const [predictions, setPredictions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -67,6 +69,12 @@ export default function SearchLocationScreen() {
           setPickup(location);
         } else {
           setDrop(location);
+        }
+
+        if (params?.mode === 'change_dest') {
+          DeviceEventEmitter.emit('change_destination_selected', place);
+          router.back();
+          return;
         }
 
         // Navigate to ride-detail only when BOTH are set
