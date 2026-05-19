@@ -27,19 +27,11 @@ export default function PaymentMethodsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
       
-      {/* Red Header */}
-      <View style={styles.redHeader}>
-        <Text style={styles.lekarLogo}>Lekar</Text>
-      </View>
-
       {/* Title */}
       <View style={styles.titleRow}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
-        </TouchableOpacity>
         <Text style={styles.pageTitle}>Payment Methods</Text>
       </View>
 
