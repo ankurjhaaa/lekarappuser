@@ -15,7 +15,8 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Image
 } from 'react-native';
 import { placesAPI } from '../../src/api/places';
 import { ridesAPI } from '../../src/api/rides';
@@ -360,10 +361,10 @@ export default function RideDetailScreen() {
 
   const getVehicleIcon = (type) => {
     const t = (type || '').toLowerCase();
-    if (t === 'bike') return 'bicycle';
-    if (t === 'auto') return 'car-sport';
-    if (t === 'toto') return 'bus';
-    if (t === 'car' || t === 'cab') return 'car';
+    if (t.includes('bike')) return 'bicycle';
+    if (t.includes('auto')) return 'car-sport';
+    if (t.includes('toto')) return 'bus';
+    if (t.includes('car') || t.includes('cab') || t.includes('xl') || t.includes('go')) return 'car';
     return 'car';
   };
 
@@ -447,7 +448,7 @@ export default function RideDetailScreen() {
 
           {/* Fare card */}
           <View style={s.fareCard}>
-            <Ionicons name={getVehicleIcon(selectedVehicle)} size={28} color={COLORS.textSecondary} />
+            <Image source={{ uri: estimates.find(e => (e.vehicle?.name || '').toLowerCase() === selectedVehicle.toLowerCase())?.vehicle?.image_link }} style={{ width: 40, height: 40, resizeMode: 'contain' }} />
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={s.fareCardLabel}>Total Fare</Text>
               <Text style={s.fareCardValue}>{formatCurrency(currentBooking?.fare_total || fare)}</Text>
@@ -500,7 +501,7 @@ export default function RideDetailScreen() {
           >
             <View style={s.enrouteCarAvatarWrap}>
               <View style={[s.enrouteCarBox, { width: 70, height: 45 }]}>
-                <Ionicons name="car-sport" size={48} color={COLORS.textLight} />
+                <Image source={{ uri: driverInfo?.vehicle?.image_link || currentBooking?.vehicle?.image_link }} style={{ width: 60, height: 40, resizeMode: 'contain' }} />
               </View>
               <View style={[s.enrouteAvatarBox, { bottom: -2, right: -2 }]}>
                 <Ionicons name="person" size={14} color={COLORS.white} />
@@ -579,7 +580,7 @@ export default function RideDetailScreen() {
           >
             <View style={s.enrouteCarAvatarWrap}>
               <View style={[s.enrouteCarBox, { width: 70, height: 45 }]}>
-                <Ionicons name="car-sport" size={48} color={COLORS.textLight} />
+                <Image source={{ uri: currentBooking?.vehicle?.image_link || driverInfo?.vehicle?.image_link }} style={{ width: 60, height: 40, resizeMode: 'contain' }} />
               </View>
               <View style={[s.enrouteAvatarBox, { bottom: -2, right: -2 }]}>
                 <Ionicons name="person" size={14} color={COLORS.white} />
@@ -952,7 +953,9 @@ export default function RideDetailScreen() {
 
               return (
                 <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
-                  <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={28} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
+                  <View style={s.vIconWrap}>
+                    <Image source={{ uri: est.vehicle?.image_link }} style={{ width: 50, height: 50, resizeMode: 'contain' }} />
+                  </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
