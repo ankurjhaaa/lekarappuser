@@ -335,9 +335,8 @@ export default function HomeScreen() {
             <View style={styles.searchIconBox}>
               <Ionicons name="search" size={18} color={COLORS.white} />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, justifyContent: 'center' }}>
               <Text style={styles.searchTitle}>Where to?</Text>
-              <Text style={styles.searchSub}>{currentAddress || 'Set your destination'}</Text>
             </View>
             <View style={styles.searchNowTag}>
               <Ionicons name="time-outline" size={13} color={COLORS.primary} />
@@ -345,23 +344,7 @@ export default function HomeScreen() {
             </View>
           </TouchableOpacity>
 
-          {/* ── Quick Actions ── */}
-          <View style={styles.quickRow}>
-            {[
-              { key: 'home', icon: 'home', label: 'Home', color: COLORS.primary, bg: COLORS.primary + '10' },
-              { key: 'work', icon: 'briefcase', label: 'Work', color: '#E65100', bg: '#FFF3E0' },
-              { key: 'saved', icon: 'star', label: 'Saved', color: '#2E7D32', bg: '#E8F5E9' },
-            ].map((q) => (
-              <TouchableOpacity key={q.key} style={styles.quickBtn} onPress={() => handleQuickAction(q.key)} activeOpacity={0.7}>
-                <View style={[styles.quickIcon, { backgroundColor: q.bg }]}>
-                  <Ionicons name={q.icon} size={17} color={q.color} />
-                </View>
-                <Text style={styles.quickLabel}>{q.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
 
-          <View style={styles.sep} />
 
           {/* ── Recent (max 3) ── */}
           {recentPlaces.length > 0 ? (

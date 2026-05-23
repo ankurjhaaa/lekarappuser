@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
+import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { ScrollView as GestureHandlerScrollView } from 'react-native-gesture-handler';
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,17 +17,14 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { placesAPI } from '../../src/api/places';
 import { ridesAPI } from '../../src/api/rides';
 import CustomModal from '../../src/components/CustomModal';
-import LekarHeader from '../../src/components/LekarHeader';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from '../../src/components/MapViewSafe';
 import CancelModal from '../../src/components/ride/CancelModal';
 import ChatModal from '../../src/components/ride/ChatModal';
 import DriverDetailModal from '../../src/components/ride/DriverDetailModal';
 import TripDetailModal from '../../src/components/ride/TripDetailModal';
-import SidebarMenu from '../../src/components/SidebarMenu';
 import { COLORS, SHADOWS, SIZES } from '../../src/constants/theme';
 import { initWebSocket, subscribeToBooking, unsubscribeFromBooking } from '../../src/services/socket';
 import useRideStore from '../../src/store/rideStore';
@@ -70,15 +69,22 @@ export default function RideDetailScreen() {
   const chatMsgRef = useRef(null);
   const bottomSheetRef = useRef(null);
 
-  // Dynamic snap points based on status
+  // Dynamic snap points per status (40-80% range)
   const snapPoints = useMemo(() => {
-    if (!bookingStatus) return ['35%', '60%', '90%'];
-    if (['searching_driver', 'driver_assigned'].includes(bookingStatus)) return ['30%', '55%', '85%'];
-    if (['driver_enroute', 'arrived_at_pickup'].includes(bookingStatus)) return ['35%', '65%', '90%'];
-    if (bookingStatus === 'ride_started') return ['30%', '60%', '90%'];
-    if (bookingStatus === 'ride_completed') return ['45%', '75%', '90%'];
-    return ['30%', '55%', '85%'];
+    if (!bookingStatus) return ['55%', '60%', '65%', '70%'];  // vehicle selection
+    if (['searching_driver', 'driver_assigned'].includes(bookingStatus)) return ['60%', '80%'];
+    if (['driver_enroute', 'arrived_at_pickup'].includes(bookingStatus)) return ['45%', '70%', '80%'];
+    if (bookingStatus === 'ride_started' || bookingStatus === 'otp_verified') return ['40%', '65%', '80%'];
+    if (bookingStatus === 'ride_completed') return ['50%', '80%'];
+    return ['50%', '65%', '80%'];  // no_driver, canceled, etc.
   }, [bookingStatus]);
+
+  // Ad carousel state
+  const adCarouselRef = useRef(null);
+  const adTimerRef = useRef(null);
+  const [activeAdSlide, setActiveAdSlide] = useState(0);
+  const AD_CARD_WIDTH = width - 32;
+  const AD_AUTO_INTERVAL = 4000;
 
   // Load directions first, then estimates with real distance
   useEffect(() => {
@@ -700,23 +706,68 @@ export default function RideDetailScreen() {
 
     return null;
   };
-  // ── Ad Banners (square image slots with clickable links) ──
+  // ── Ad Banners as auto-sliding carousel ──
   const AD_SLOTS = [
-    { link: 'https://lekar.in/offers', placeholder: 'Ad Image 1' },
-    { link: 'https://lekar.in/refer', placeholder: 'Ad Image 2' },
-    { link: 'https://lekar.in/safety', placeholder: 'Ad Image 3' },
+    { link: 'https://lekar.in/offers', placeholder: 'Ad Image 1', icon: 'pricetag', color: '#E53935', bg: '#FFEBEE' },
+    { link: 'https://lekar.in/refer', placeholder: 'Ad Image 2', icon: 'people', color: '#1E88E5', bg: '#E3F2FD' },
+    { link: 'https://lekar.in/safety', placeholder: 'Ad Image 3', icon: 'shield-checkmark', color: '#2E7D32', bg: '#E8F5E9' },
   ];
+
+  // Auto-scroll ads
+  useEffect(() => {
+    adTimerRef.current = setInterval(() => {
+      setActiveAdSlide((prev) => {
+        const next = (prev + 1) % AD_SLOTS.length;
+        adCarouselRef.current?.scrollTo({ x: next * AD_CARD_WIDTH, animated: true });
+        return next;
+      });
+    }, AD_AUTO_INTERVAL);
+    return () => clearInterval(adTimerRef.current);
+  }, []);
+
+  const onAdScroll = useCallback((e) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / AD_CARD_WIDTH);
+    if (idx >= 0 && idx < AD_SLOTS.length && idx !== activeAdSlide) setActiveAdSlide(idx);
+  }, [activeAdSlide]);
+
   const renderAds = () => (
-    <View style={{ marginTop: 14, gap: 10 }}>
-      {AD_SLOTS.map((ad, i) => (
-        <TouchableOpacity key={i} style={s.adSquare} onPress={() => Linking.openURL(ad.link)} activeOpacity={0.8}>
-          {/* Replace this View with <Image source={...} style={s.adImage} /> when you have real ad images */}
-          <View style={s.adImagePlaceholder}>
-            <Ionicons name="image-outline" size={40} color={COLORS.textLight} />
-            <Text style={s.adPlaceholderText}>{ad.placeholder}</Text>
-          </View>
-        </TouchableOpacity>
-      ))}
+    <View style={{ marginTop: 14 }}>
+      <GestureHandlerScrollView
+        ref={adCarouselRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        onScroll={onAdScroll}
+        scrollEventThrottle={16}
+        onScrollBeginDrag={() => clearInterval(adTimerRef.current)}
+        onScrollEndDrag={() => {
+          adTimerRef.current = setInterval(() => {
+            setActiveAdSlide((prev) => {
+              const next = (prev + 1) % AD_SLOTS.length;
+              adCarouselRef.current?.scrollTo({ x: next * AD_CARD_WIDTH, animated: true });
+              return next;
+            });
+          }, AD_AUTO_INTERVAL);
+        }}
+        snapToInterval={AD_CARD_WIDTH}
+        snapToAlignment="start"
+        decelerationRate="fast"
+        nestedScrollEnabled
+      >
+        {AD_SLOTS.map((ad, i) => (
+          <TouchableOpacity key={i} style={[s.adSlide, { width: AD_CARD_WIDTH }]} onPress={() => Linking.openURL(ad.link)} activeOpacity={0.85}>
+            <View style={[s.adImagePlaceholder, { backgroundColor: ad.bg }]}>
+              <Ionicons name={ad.icon} size={36} color={ad.color} />
+              <Text style={s.adPlaceholderText}>{ad.placeholder}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </GestureHandlerScrollView>
+      {/* Dots */}
+      <View style={s.adDotsRow}>
+        {AD_SLOTS.map((_, i) => (
+          <View key={i} style={[s.adDot, activeAdSlide === i && s.adDotActive]} />
+        ))}
+      </View>
     </View>
   );
 
@@ -796,31 +847,53 @@ export default function RideDetailScreen() {
     return null;
   };
 
+  const renderHandle = () => (
+    <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 4 }}>
+      <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: '#D0D0D0' }} />
+    </View>
+  );
+
   return (
-    <SafeAreaView style={s.container} edges={['bottom']}>
-      {/* TOP HALF: MAP */}
-      <View style={s.mapContainer}>
+    <View style={s.container}>
+      {/* ── Full-screen Map ── */}
+      <View style={s.mapWrapper}>
         <MapView
           ref={mapRef}
-          style={StyleSheet.absoluteFillObject}
+          style={s.map}
           provider={PROVIDER_GOOGLE}
           initialRegion={{
             latitude: pickup?.lat || 25.6117, longitude: pickup?.lng || 85.1441,
             latitudeDelta: 0.03, longitudeDelta: 0.03,
           }}
-          showsUserLocation showsMyLocationButton={false}
+          showsUserLocation
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsBuildings={false}
+          showsIndoors={false}
+          customMapStyle={cleanMapStyle}
         >
+          {/* Pickup marker - green */}
           {pickup?.lat && !['ride_started', 'ride_completed'].includes(bookingStatus) && (
-            <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}>
-              <View style={s.pickupMarker}><View style={s.pickupDot} /></View>
+            <Marker coordinate={{ latitude: pickup.lat, longitude: pickup.lng }} anchor={{ x: 0.5, y: 1 }} tracksViewChanges={true}>
+              <View style={{ width: 200, height: 70, alignItems: 'center', justifyContent: 'flex-end' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#2E7D32', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, gap: 5 }}>
+                  <Ionicons name="location" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Pickup</Text>
+                </View>
+                <View style={{ width: 0, height: 0, borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 6, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: '#2E7D32' }} />
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: '#2E7D32', borderWidth: 2, borderColor: '#fff' }} />
+              </View>
             </Marker>
           )}
+          {/* Drop marker - red */}
           {drop?.lat && bookingStatus !== 'ride_completed' && (
             <Marker coordinate={{ latitude: drop.lat, longitude: drop.lng }}>
               <View style={s.dropMarker}><Ionicons name="location" size={28} color={COLORS.primary} /></View>
             </Marker>
           )}
+          {/* Route polyline */}
           {routeCoords.length > 0 && <Polyline coordinates={routeCoords} strokeColor={COLORS.primary} strokeWidth={4} />}
+          {/* Driver marker */}
           {driverLoc && ['driver_enroute', 'arrived_at_pickup', 'ride_started'].includes(bookingStatus) && (
             <Marker coordinate={{ latitude: driverLoc.lat, longitude: driverLoc.lng }} rotation={driverHeading} flat anchor={{ x: 0.5, y: 0.5 }}>
               <View style={s.driverMapMarker}><Ionicons name={getVehicleIcon(driverInfo?.vehicle_type || selectedVehicle)} size={18} color={COLORS.white} /></View>
@@ -828,95 +901,111 @@ export default function RideDetailScreen() {
           )}
         </MapView>
 
-        {/* My Location Button */}
-        <TouchableOpacity style={s.myLocBtn}>
-          <Ionicons name="locate" size={20} color={COLORS.primary} />
+        {/* Back button */}
+        <TouchableOpacity style={s.floatingBack} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={22} color={COLORS.text} />
+        </TouchableOpacity>
+
+        {/* Recenter */}
+        <TouchableOpacity style={s.myLocBtn} onPress={() => {
+          if (mapRef.current && routeCoords.length > 0) {
+            mapRef.current.fitToCoordinates(routeCoords, { edgePadding: { top: 80, right: 50, bottom: 300, left: 50 }, animated: true });
+          }
+        }}>
+          <Ionicons name="navigate" size={18} color="#2E7D32" />
         </TouchableOpacity>
       </View>
 
-      {/* BOTTOM HALF: CONTENT */}
-      <View style={s.contentContainer}>
+      {/* ── Sliding Panel ── */}
+      <BottomSheet
+        ref={bottomSheetRef}
+        index={1}
+        snapPoints={snapPoints}
+        handleComponent={renderHandle}
+        backgroundStyle={s.sheetBg}
+        enablePanDownToClose={false}
+        overDragResistanceFactor={4}
+        animateOnMount
+        style={s.sheetShadow}
+      >
         {bookingStatus ? (
-          <>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={s.statusPanelInner} showsVerticalScrollIndicator={false}>
-              {renderStatusUI()}
-              {renderAds()}
-            </ScrollView>
-            {renderStickyFooter()}
-          </>
+          <BottomSheetScrollView contentContainerStyle={s.statusPanelInner} showsVerticalScrollIndicator={false}>
+            {renderStatusUI()}
+            {renderAds()}
+          </BottomSheetScrollView>
         ) : (
-          <>
-            <ScrollView style={{ flex: 1 }} contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
-              {(estimates.length > 0 ? estimates : [
-                { vehicle: { name: 'LekarGo', seats: 4 }, fare: 0, eta_min: null },
-                { vehicle: { name: 'LekarXL', seats: 4 }, fare: 0, eta_min: null },
-                { vehicle: { name: 'LekarAuto', seats: 3 }, fare: 0, eta_min: null },
-                { vehicle: { name: 'LekarBike', seats: 1 }, fare: 0, eta_min: null },
-              ]).map((est, i) => {
-                const name = est.vehicle?.name || 'LekarGo';
-                const seats = est.vehicle?.seats || (name.includes('Bike') ? 1 : name.includes('Auto') ? 3 : 4);
-                const isSelected = name.toLowerCase() === selectedVehicle.toLowerCase();
-                const distKm = distance || 0;
-                const calcMin = Math.round(distKm * 1.5) || 1;
-                const arrivalDate = new Date();
-                arrivalDate.setMinutes(arrivalDate.getMinutes() + calcMin);
-                const arrivalStr = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          <BottomSheetScrollView contentContainerStyle={s.sheetContent} showsVerticalScrollIndicator={false}>
+            {(estimates.length > 0 ? estimates : [
+              { vehicle: { name: 'LekarGo', seats: 4 }, fare: 0, eta_min: null },
+              { vehicle: { name: 'LekarXL', seats: 4 }, fare: 0, eta_min: null },
+              { vehicle: { name: 'LekarAuto', seats: 3 }, fare: 0, eta_min: null },
+              { vehicle: { name: 'LekarBike', seats: 1 }, fare: 0, eta_min: null },
+            ]).map((est, i) => {
+              const name = est.vehicle?.name || 'LekarGo';
+              const seats = est.vehicle?.seats || (name.includes('Bike') ? 1 : name.includes('Auto') ? 3 : 4);
+              const isSelected = name.toLowerCase() === selectedVehicle.toLowerCase();
+              const distKm = distance || 0;
+              const calcMin = Math.round(distKm * 1.5) || 1;
+              const arrivalDate = new Date();
+              arrivalDate.setMinutes(arrivalDate.getMinutes() + calcMin);
+              const arrivalStr = arrivalDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                return (
-                  <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
-                    <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={28} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
-                        <Ionicons name="person" size={12} color={COLORS.textSecondary} />
-                        <Text style={s.vSeats}>{seats}</Text>
-                      </View>
-                      <Text style={s.vSub}>{calcMin} mins • Drop at {arrivalStr}</Text>
-                      {i === 0 && isSelected && <View style={s.fastestBadge}><Ionicons name="flash" size={10} color="#E65100" /><Text style={s.fastestText}>Fastest</Text></View>}
+              return (
+                <TouchableOpacity key={i} style={[s.vRow, isSelected && s.vRowSelected]} onPress={() => setSelectedVehicle(name.toLowerCase())} activeOpacity={0.7}>
+                  <View style={s.vIconWrap}><Ionicons name={getVehicleIcon(name)} size={28} color={isSelected ? COLORS.primary : COLORS.textSecondary} /></View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={[s.vName, isSelected && { color: COLORS.primary }]}>{name}</Text>
+                      <Ionicons name="person" size={12} color={COLORS.textSecondary} />
+                      <Text style={s.vSeats}>{seats}</Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[s.vFare, isSelected && { color: COLORS.text }]}>{est.fare ? formatCurrency(est.fare) : '--'}</Text>
-                      {est.fare > 0 && <Text style={s.vFareOld}>₹{Math.round(est.fare * 1.06)}</Text>}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-            <View style={s.bookBar}>
-              <View style={s.bookBarTop}>
-                <TouchableOpacity style={s.personalBtn}>
-                  <Text style={s.personalText}>Personal</Text>
-                  <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+                    <Text style={s.vSub}>{calcMin} mins • Drop at {arrivalStr}</Text>
+                    {i === 0 && isSelected && <View style={s.fastestBadge}><Ionicons name="flash" size={10} color="#E65100" /><Text style={s.fastestText}>Fastest</Text></View>}
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[s.vFare, isSelected && { color: COLORS.text }]}>{est.fare ? formatCurrency(est.fare) : '--'}</Text>
+                    {est.fare > 0 && <Text style={s.vFareOld}>₹{Math.round(est.fare * 1.06)}</Text>}
+                  </View>
                 </TouchableOpacity>
-                <View style={s.bookBarDivider} />
-                <TouchableOpacity style={s.cashBtn}>
-                  <Ionicons name="card-outline" size={16} color={COLORS.primary} />
-                  <Text style={s.cashBtnText}>Cash</Text>
-                </TouchableOpacity>
-                <View style={{ flex: 1 }} />
-                <TouchableOpacity style={s.nowBtn}>
-                  <Ionicons name="calendar-outline" size={14} color={COLORS.primary} />
-                  <Text style={s.nowText}>Now</Text>
-                  <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={s.bookBtn} onPress={handleBook} disabled={booking || !drop?.lat} activeOpacity={0.8}>
-                {booking ? <ActivityIndicator color="#fff" /> : (
-                  <Text style={s.bookBtnText}>Book {selectedVehicle.charAt(0).toUpperCase() + selectedVehicle.slice(1)}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </>
+              );
+            })}
+          </BottomSheetScrollView>
         )}
-      </View>
+      </BottomSheet>
 
-      {/* Destination History Modal */}
+      {/* ── Fixed Bottom Buttons (outside BottomSheet) ── */}
+      {bookingStatus ? renderStickyFooter() : (
+        <View style={s.fixedBookBar}>
+          <View style={s.bookBarTop}>
+            <TouchableOpacity style={s.personalBtn}>
+              <Text style={s.personalText}>Personal</Text>
+              <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+            <View style={s.bookBarDivider} />
+            <TouchableOpacity style={s.cashBtn}>
+              <Ionicons name="card-outline" size={16} color={COLORS.primary} />
+              <Text style={s.cashBtnText}>Cash</Text>
+            </TouchableOpacity>
+            <View style={{ flex: 1 }} />
+            <TouchableOpacity style={s.nowBtn}>
+              <Ionicons name="calendar-outline" size={14} color={COLORS.primary} />
+              <Text style={s.nowText}>Now</Text>
+              <Ionicons name="chevron-down" size={14} color={COLORS.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={s.bookBtn} onPress={handleBook} disabled={booking || !drop?.lat} activeOpacity={0.8}>
+            {booking ? <ActivityIndicator color="#fff" /> : (
+              <Text style={s.bookBtnText}>Book {selectedVehicle.charAt(0).toUpperCase() + selectedVehicle.slice(1)}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Modals */}
       <CustomModal visible={showHistory} onClose={() => setShowHistory(false)}>
         <TouchableOpacity activeOpacity={1} style={s.modalSheet}>
           <View style={s.modalHandle}><View style={s.modalHandleBar} /></View>
-          <View style={s.modalHeader}>
-            <Text style={s.modalTitle}>Destination History</Text>
-          </View>
+          <View style={s.modalHeader}><Text style={s.modalTitle}>Destination History</Text></View>
           <ScrollView style={{ maxHeight: 400, marginTop: 10 }}>
             {currentBooking?.segments?.map((seg, i) => (
               <View key={i} style={{ flexDirection: 'row', marginBottom: 16 }}>
@@ -934,41 +1023,33 @@ export default function RideDetailScreen() {
         </TouchableOpacity>
       </CustomModal>
 
-      {/* Cancel Reason Modal */}
       <CancelModal visible={showCancel} onClose={() => setShowCancel(false)} onConfirm={confirmCancel} />
-
-      {/* Driver Profile Modal */}
       <DriverDetailModal visible={showDriverDetail} onClose={() => setShowDriverDetail(false)} booking={currentBooking} driverInfo={driverInfo} />
-
-      {/* Trip Detail Modal */}
       <TripDetailModal visible={showTripDetail} onClose={() => setShowTripDetail(false)} booking={currentBooking} liveDistanceKm={liveDistanceKm} liveETA={liveETA} />
-
-      {/* Chat Modal */}
-      <ChatModal
-        visible={showChat}
-        onClose={() => setShowChat(false)}
-        bookingId={currentBooking?.id}
-        driverName={currentBooking?.driver?.name || currentBooking?.driver_name || 'Captain'}
-        onNewMessage={chatMsgRef}
-      />
-    </SafeAreaView>
+      <ChatModal visible={showChat} onClose={() => setShowChat(false)} bookingId={currentBooking?.id} driverName={currentBooking?.driver?.name || currentBooking?.driver_name || 'Captain'} onNewMessage={chatMsgRef} />
+    </View>
   );
 }
 
+// Clean map style
+const cleanMapStyle = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'poi.park', stylers: [{ visibility: 'on' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+  { featureType: 'landscape.man_made', elementType: 'geometry.stroke', stylers: [{ visibility: 'off' }] },
+];
+
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  lekarHeader: { backgroundColor: COLORS.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: Platform.OS === 'android' ? 36 : 6, paddingBottom: 12 },
-  headerBackBtn: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  lekarLogo: { fontSize: 26, fontWeight: '800', color: COLORS.white, fontStyle: 'italic' },
-  mapContainer: { flex: 1, width: '100%' },
-  contentContainer: { flex: 1, width: '100%', backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, marginTop: -20, ...SHADOWS.large },
-  floatingBack: { position: 'absolute', top: 80, left: 16, width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', ...SHADOWS.small, zIndex: 10 },
-  pickupMarker: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#06D6A020', justifyContent: 'center', alignItems: 'center' },
-  pickupDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: COLORS.success, borderWidth: 2, borderColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#E8E8E8' },
+  mapWrapper: { flex: 1 },
+  map: { flex: 1 },
+  floatingBack: { position: 'absolute', top: Platform.OS === 'android' ? 44 : 56, left: 16, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium, zIndex: 10 },
   dropMarker: { alignItems: 'center' },
-  driverMapMarker: { width: 40, height: 40, borderRadius: 20, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#fff', ...SHADOWS.medium },
-  myLocBtn: { position: 'absolute', right: 12, bottom: 12, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
-  statusPanelInner: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 24 },
+  driverMapMarker: { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#fff', ...SHADOWS.medium },
+  myLocBtn: { position: 'absolute', right: 14, bottom: 14, width: 42, height: 42, borderRadius: 21, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', ...SHADOWS.medium },
+  sheetShadow: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 10, elevation: 14 },
+  sheetBg: { backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  statusPanelInner: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
   sheetContent: { paddingHorizontal: 0, paddingBottom: 10, paddingTop: 0 },
   vRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16, borderWidth: 2, borderColor: 'transparent', marginHorizontal: 12, marginVertical: 4, borderRadius: 16 },
   vRowSelected: { backgroundColor: '#FFF5F5', borderColor: COLORS.primary, ...SHADOWS.small },
@@ -980,7 +1061,9 @@ const s = StyleSheet.create({
   vFareOld: { fontSize: SIZES.xs, color: COLORS.textLight, textDecorationLine: 'line-through', marginTop: 2, textAlign: 'right' },
   fastestBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginTop: 6 },
   fastestText: { fontSize: 10, fontWeight: '800', color: '#E65100', textTransform: 'uppercase' },
-  bookBar: { paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 10 : 16, paddingTop: 10, borderTopWidth: 1, borderTopColor: COLORS.border + '50', backgroundColor: '#fff' },
+
+  // Fixed bottom booking bar (outside BottomSheet)
+  fixedBookBar: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingBottom: Platform.OS === 'ios' ? 28 : 16, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F0F0', ...SHADOWS.large, zIndex: 100 },
   bookBarTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   personalBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   personalText: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text },
@@ -989,11 +1072,11 @@ const s = StyleSheet.create({
   cashBtnText: { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.text },
   nowBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   nowText: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text },
-  bookBtn: { backgroundColor: COLORS.primary, paddingVertical: 16, borderRadius: SIZES.radiusXl, alignItems: 'center' },
-  bookBtnText: { color: '#fff', fontSize: SIZES.lg, fontWeight: '700' },
+  bookBtn: { backgroundColor: COLORS.primary, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', ...SHADOWS.medium },
+  bookBtnText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
 
-  // Searching status - premium card
-  searchCard: { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 12, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  // Searching status
+  searchCard: { alignItems: 'center', backgroundColor: '#FAFAFA', borderRadius: 14, padding: 20, marginBottom: 12, borderWidth: 1, borderColor: '#F0F0F0' },
   searchPulseOuter: { width: 70, height: 70, borderRadius: 35, backgroundColor: COLORS.primary + '15', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
   searchPulseInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: COLORS.primary + '25', justifyContent: 'center', alignItems: 'center' },
   searchTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text, marginBottom: 4 },
@@ -1008,21 +1091,21 @@ const s = StyleSheet.create({
   noDriverTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginBottom: 8, textAlign: 'center' },
   noDriverSubtitle: { fontSize: SIZES.md, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 22 },
 
-  // Sticky footer
-  stickyFooter: { paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: COLORS.border + '40', backgroundColor: '#fff' },
-  fareCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
+  // Sticky footer — fixed at bottom
+  stickyFooter: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingVertical: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#F0F0F0', ...SHADOWS.large, zIndex: 100 },
+  fareCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F0F0F0', ...SHADOWS.small },
   fareCardLabel: { fontSize: 11, color: COLORS.textSecondary },
   fareCardValue: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  tripDetailsBtn: { borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  tripDetailsBtnText: { fontSize: SIZES.sm, fontWeight: '600', color: COLORS.text },
+  tripDetailsBtn: { borderWidth: 1.5, borderColor: COLORS.primary + '30', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  tripDetailsBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primary },
 
-  // DRIVER ENROUTE UI (Figma matching)
+  // DRIVER ENROUTE UI
   enrouteContainer: { paddingTop: 4, paddingBottom: 16 },
   enrouteHeaderTitle: { fontSize: 18, fontWeight: '800', color: '#1A1A1A', textAlign: 'center', marginBottom: 12 },
-  enrouteOtpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, backgroundColor: '#FFF5F5', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#FFE4E4' },
+  enrouteOtpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, backgroundColor: '#FFF5F5', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: '#FFE4E4' },
   enrouteOtpLabel: { fontSize: SIZES.md, fontWeight: '700', color: COLORS.primary },
   enrouteOtpBoxes: { flexDirection: 'row', gap: 6 },
-  enrouteOtpBox: { width: 34, height: 38, borderRadius: 8, borderWidth: 1.5, borderColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
+  enrouteOtpBox: { width: 36, height: 40, borderRadius: 10, borderWidth: 1.5, borderColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' },
   enrouteOtpText: { fontSize: 18, fontWeight: '800', color: COLORS.primary },
   enrouteDivider: { height: 1, backgroundColor: '#F0F0F0', marginBottom: 14 },
   enrouteDriverRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
@@ -1035,13 +1118,13 @@ const s = StyleSheet.create({
   enrouteDriverName: { fontSize: SIZES.md, fontWeight: '700', color: '#1A1A1A' },
   enrouteVehicleName: { fontSize: 11, fontWeight: '600', color: '#666', marginTop: 2, textTransform: 'uppercase' },
 
-  enrouteDestBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', padding: 12, borderRadius: 12, marginBottom: 16 },
+  enrouteDestBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8F9FA', padding: 14, borderRadius: 14, marginBottom: 16 },
   enrouteDestLabel: { fontSize: 11, fontWeight: '600', color: '#888', marginBottom: 2 },
   enrouteDestText: { fontSize: SIZES.sm, fontWeight: '700', color: '#1A1A1A' },
   enrouteTripDetailsText: { fontSize: SIZES.sm, fontWeight: '800', color: COLORS.primary },
 
-  enrouteActionRow: { flexDirection: 'row', gap: 12 },
-  enrouteBtnAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFF5F5', paddingVertical: 12, borderRadius: 12 },
+  enrouteActionRow: { flexDirection: 'row', gap: 10 },
+  enrouteBtnAction: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: '#FFF5F5', height: 52, borderRadius: 14, borderWidth: 1, borderColor: '#FFE4E4' },
   enrouteBtnText: { fontSize: SIZES.sm, fontWeight: '700', color: COLORS.primary },
 
   // Ride started
@@ -1052,34 +1135,36 @@ const s = StyleSheet.create({
   dropLabel: { fontSize: 11, color: COLORS.textSecondary, fontWeight: '500' },
   dropAddr: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text, marginTop: 2 },
 
-  // Actions
-  actionRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  actionBtn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 10, backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.border, gap: 3 },
-  actionBtnText: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
-  cancelOutlineBtn: { alignItems: 'center', paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, borderColor: COLORS.error + '40', marginBottom: 10 },
-  cancelOutlineBtnText: { color: COLORS.error, fontWeight: '700', fontSize: SIZES.sm },
+  // Action buttons — premium style
+  actionRow: { flexDirection: 'row', gap: 10 },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 52, borderRadius: 14, backgroundColor: '#F8F9FA', borderWidth: 1, borderColor: '#F0F0F0' },
+  actionBtnText: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
+  cancelOutlineBtn: { alignItems: 'center', justifyContent: 'center', height: 52, borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.error + '30', backgroundColor: COLORS.error + '08' },
+  cancelOutlineBtnText: { color: COLORS.error, fontWeight: '800', fontSize: 15 },
 
-  // Completed — Lekar style
+  // Completed
   completedSection: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
   completedIcon: { width: 54, height: 54, borderRadius: 27, backgroundColor: COLORS.success, justifyContent: 'center', alignItems: 'center' },
   completedTitle: { fontSize: SIZES.xl, fontWeight: '800', color: COLORS.text },
   completedFare: { fontSize: 32, fontWeight: '900', color: COLORS.text, marginTop: 2 },
   completedPayment: { fontSize: SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  fareBreakdownCard: { backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: COLORS.border },
-  tripTimeline: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 12, marginBottom: 12 },
-  ratingSection: { alignItems: 'center', marginBottom: 12, borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 12 },
+  fareBreakdownCard: { backgroundColor: '#F9F9F9', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#F0F0F0' },
+  tripTimeline: { borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12, marginBottom: 12 },
+  ratingSection: { alignItems: 'center', marginBottom: 12, borderTopWidth: 1, borderTopColor: '#F0F0F0', paddingTop: 12 },
   ratingLabel: { fontSize: SIZES.md, fontWeight: '600', color: COLORS.text, marginBottom: 10 },
   starsRow: { flexDirection: 'row', gap: 8 },
-  primaryBtn: { backgroundColor: COLORS.primary, paddingVertical: 15, borderRadius: SIZES.radiusXl, alignItems: 'center', marginBottom: 10 },
-  primaryBtnText: { color: '#fff', fontSize: SIZES.lg, fontWeight: '700' },
-  outlineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 15, borderRadius: SIZES.radiusXl, borderWidth: 1.5, borderColor: COLORS.primary, marginBottom: 10 },
-  outlineBtnText: { fontSize: SIZES.md, fontWeight: '700', color: COLORS.primary },
+  primaryBtn: { backgroundColor: COLORS.primary, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', ...SHADOWS.medium },
+  primaryBtnText: { color: '#fff', fontSize: 17, fontWeight: '800', letterSpacing: 0.3 },
+  outlineBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 52, borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.primary },
+  outlineBtnText: { fontSize: 15, fontWeight: '700', color: COLORS.primary },
 
-  // Ad banners (square image slots)
-  adSquare: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, overflow: 'hidden', backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: COLORS.border },
-  adImagePlaceholder: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  adPlaceholderText: { fontSize: SIZES.sm, color: COLORS.textLight, marginTop: 6 },
-  adImage: { width: '100%', height: '100%', borderRadius: 12 },
+  // Ad carousel
+  adSlide: { marginRight: 10, borderRadius: 14, overflow: 'hidden' },
+  adImagePlaceholder: { height: 170, justifyContent: 'center', alignItems: 'center', borderRadius: 14 },
+  adPlaceholderText: { fontSize: 13, color: '#888', fontWeight: '600', marginTop: 6 },
+  adDotsRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
+  adDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#D0D0D0' },
+  adDotActive: { width: 18, backgroundColor: COLORS.primary, borderRadius: 3 },
 
   // Modals — clean white sheet from bottom
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
