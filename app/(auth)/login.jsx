@@ -20,6 +20,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { authAPI } from '../../src/api/auth';
 import { COLORS } from '../../src/constants/theme';
 import useAuthStore from '../../src/store/authStore';
+import { getExpoPushToken } from '../../src/utils/pushToken';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -103,11 +104,14 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      const pushToken = await getExpoPushToken();
+
       const payload = {
         otp: code,
         email: email.trim(),
         device_name: Platform.OS + '_lekar_user',
         device_type: Platform.OS === 'ios' ? 'ios' : 'android',
+        expo_push_token: pushToken,
       };
 
       const res = await authAPI.verifyOtp(payload);
@@ -137,11 +141,14 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
+      const pushToken = await getExpoPushToken();
+
       const payload = {
         email: cleanEmail,
         password: password,
         device_name: Platform.OS + '_lekar_user',
         device_type: Platform.OS === 'ios' ? 'ios' : 'android',
+        expo_push_token: pushToken,
       };
 
       const res = await authAPI.loginPassword(payload);
